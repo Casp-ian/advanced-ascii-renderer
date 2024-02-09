@@ -118,7 +118,7 @@ impl CharSet {
             if brightness > 50 {
                 return "⡈";
             }
-            return " ";
+            return "⠀";
         }
 
         return " ";
