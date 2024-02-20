@@ -182,6 +182,7 @@ fn main() {
 
 fn process_image(image: DynamicImage, width: u32, height: u32, set: CharSet, color: ColorSet, inverted: bool) -> String {
 
+    // TODO because of rounding there are often pixels cut off, also because of rounding we need to keep checking for out of bounds
     let part_height = (image.height() as f32 / height as f32).round() as u32;
     let part_width = (image.width() as f32 / width as f32).round() as u32;
 
