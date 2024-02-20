@@ -127,11 +127,13 @@ impl CharSet {
 
 fn get_brightness(pixel: Rgba<u8>) -> u8 {
     // TODO to luma? does it matter?
-    let red = pixel.0[0];
-    let green = pixel.0[1];
-    let blue = pixel.0[2];
-    let alpha = pixel.0[3];
-    return (red / 3) + (green / 3) + (blue / 3) - (255 - alpha);
+    let red = pixel.0[0] as f64;
+    let green = pixel.0[1] as f64;
+    let blue = pixel.0[2] as f64;
+    let alpha = pixel.0[3] as f64;
+
+    // source https://en.wikipedia.org/wiki/Relative_luminance
+    return ((red * 0.2126) + (green * 0.7152) + (blue * 0.0722) * (alpha / 255.0)) as u8;
 }
 
 fn main() {
