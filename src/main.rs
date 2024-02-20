@@ -1,3 +1,5 @@
+use std::u32;
+
 use clap::{Parser, ValueEnum};
 use image::{io::Reader, DynamicImage, GenericImageView, Pixel, Rgba};
 
@@ -14,10 +16,6 @@ struct Args {
     #[arg(long, default_value_t = 64)]
     width: u32,
 
-    /// Height in characters
-    #[arg(long, default_value_t = 32)]
-    height: u32,
-
     /// Color of text
     #[arg(long, default_value_t, value_enum)]
     color: ColorSet,
@@ -25,6 +23,10 @@ struct Args {
     /// Characters used for result
     #[arg(long, default_value_t, value_enum)]
     set: CharSet,
+
+    /// Characters used for result
+    #[arg(long)]
+    inverted: bool,
 }
 
 const BLACK: &str = "\x1b[30m";
@@ -83,7 +85,6 @@ impl ColorSet {
     }
 }
 
-
 #[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
 enum CharSet {
     #[default]
@@ -96,16 +97,34 @@ impl CharSet {
         let brightness = get_brightness(pixel);
 
         if self == &CharSet::Filled {
-            if brightness > 200 {
+
+            // █#eo+,.
+
+            if brightness > 215 {
+                return "█";
+            }
+            if brightness > 180 {
                 return "#";
             }
-            if brightness > 100 {
-                return "/";
+            if brightness > 145 {
+                return "e";
+            }
+            if brightness > 110 {
+                return "o";
+            }
+            if brightness > 75 {
+                return ",";
+            }
+            if brightness > 40 {
+                return ".";
             }
             return " ";
         }
 
         if self == &CharSet::Braile {
+
+            // ⣿⣫⢕⡈⠀   <- dont forget the invisible character at the end
+
             if brightness > 200 {
                 return "⣿";
             }
@@ -118,6 +137,7 @@ impl CharSet {
             if brightness > 50 {
                 return "⡈";
             }
+            // this is not a space, this is an empty braile character
             return "⠀";
         }
 
@@ -126,7 +146,6 @@ impl CharSet {
 }
 
 fn get_brightness(pixel: Rgba<u8>) -> u8 {
-    // TODO to luma? does it matter?
     let red = pixel.0[0] as f64;
     let green = pixel.0[1] as f64;
     let blue = pixel.0[2] as f64;
@@ -148,26 +167,52 @@ fn main() {
     if img_result.is_err() {
         return;
     }
-    let img = img_result.unwrap();
+    let image = img_result.unwrap();
 
-    // TODO change image to text
-    println!("{}", process_image(img, args.width, args.height, args.set, args.color));
+
+    // match aspect ratio
+    let img_aspect_ratio = image.width() as f32 / image.height() as f32;
+    // todo this will differ between terminal and charset, might need to fix this but difference might be ignorable
+    let char_aspect_ratio = 2.15 as f32; 
+
+    let matched_height = (args.width as f32 / char_aspect_ratio / img_aspect_ratio).round() as u32;
+
+    println!("{}", process_image(image, args.width, matched_height, args.set, args.color, args.inverted));
 }
 
+fn process_image(image: DynamicImage, width: u32, height: u32, set: CharSet, color: ColorSet, inverted: bool) -> String {
 
-fn process_image(image: DynamicImage, width: u32, height: u32, set: CharSet, color: ColorSet) -> String {
-
-    let part_height = image.height() / height;
-    let part_width = image.width() / width;
+    let part_height = (image.height() as f32 / height as f32).round() as u32;
+    let part_width = (image.width() as f32 / width as f32).round() as u32;
 
     let mut result = "".to_string();
 
+    println!("partheight: {}", part_height);
+    println!("part: {}", part_width);
+
     // iterate over parts of image
     for y in 0..height {
+
+        if height < y+1 * part_height {
+            // TODO dont spam user with warning, only print once
+            println!("\x1b[93mWarning: some edge pixels may be skipped because of a too high resolution\x1b[0m");
+            continue;
+        }
+
         for x in 0..width {
 
+            if width < x+1 * part_width {
+            // TODO dont spam user with warning, only print once
+            println!("\x1b[93mWarning: some edge pixels may be skipped because of a too high resolution\x1b[0m");
+            continue;
+            }
+    
             // get average value of part
-            let pixel = get_blended_pixel(&image, part_width * x, part_height * y, part_width, part_height);
+            let mut pixel = get_blended_pixel(&image, part_width * x, part_height * y, part_width, part_height);
+
+            if inverted {
+                pixel.invert();
+            }
 
             // place char in result string
             result += color.get_color_prefix(pixel);
@@ -180,8 +225,6 @@ fn process_image(image: DynamicImage, width: u32, height: u32, set: CharSet, col
 }
 
 fn get_blended_pixel(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> Rgba<u8> {
-    let _ = (1..6).map(f64::from);
-
     // TODO clean up, for now it takes the average of 4 pixels spread around the given area
     let mut pixel1 = image.get_pixel(x + (    width / 4),  y + (    height / 4));
     let mut pixel2 = image.get_pixel(x + (    width / 4),  y + (3 * height / 4));
