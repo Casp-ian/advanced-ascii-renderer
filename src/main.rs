@@ -187,24 +187,17 @@ fn process_image(image: DynamicImage, width: u32, height: u32, set: CharSet, col
 
     let mut result = "".to_string();
 
-    println!("partheight: {}", part_height);
-    println!("part: {}", part_width);
-
     // iterate over parts of image
     for y in 0..height {
 
-        if height < y+1 * part_height {
-            // TODO dont spam user with warning, only print once
-            println!("\x1b[93mWarning: some edge pixels may be skipped because of a too high resolution\x1b[0m");
-            continue;
+        if image.height() < (y+1) * part_height {
+            break;
         }
 
         for x in 0..width {
 
-            if width < x+1 * part_width {
-            // TODO dont spam user with warning, only print once
-            println!("\x1b[93mWarning: some edge pixels may be skipped because of a too high resolution\x1b[0m");
-            continue;
+            if image.width() < (x+1) * part_width {
+                break;
             }
     
             // get average value of part
