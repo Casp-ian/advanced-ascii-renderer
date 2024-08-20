@@ -99,7 +99,7 @@ impl ColorSet {
 enum CharSet {
     #[default]
     Braile,
-    Filled,
+    Ascii,
     Numbers,
     Discord,
 }
@@ -107,7 +107,7 @@ enum CharSet {
 impl CharSet {
     fn get_char(&self, brightness: f32) -> &str {
         let set = match self {
-            &CharSet::Filled => vec![" ", ".", "\"", "+", "o", "?", "#"],
+            &CharSet::Ascii => vec![" ", ".", "\"", "+", "o", "?", "#"],
             &CharSet::Numbers => vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
             &CharSet::Discord => vec![
                 ":black_large_square:",
@@ -241,7 +241,7 @@ fn main() {
         image.height(),
     );
 
-    let pixel_info = preprocess_image(image, args.lines);
+    let pixel_info = preprocess_image(image, args.no_lines);
 
     let result = translate_to_text(
         pixel_info,
