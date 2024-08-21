@@ -1,4 +1,4 @@
-use std::u32;
+use std::{f32::consts::PI, u32};
 
 use clap::{Parser, ValueEnum};
 use image::{io::Reader, DynamicImage, GenericImageView, Rgba};
@@ -104,8 +104,33 @@ enum CharSet {
     Discord,
 }
 
+// honestly i dont think i had a good reason to put this method inside of the enum, TODO move everything except the char vec
 impl CharSet {
-    fn get_char(&self, brightness: f32) -> &str {
+    fn get_char(&self, pixel: &PixelData, no_lines: bool) -> &str {
+        if !no_lines && pixel.edgeness > 0.75 {
+            let dir = pixel.direction;
+            if (dir < (2.0 * PI / 3.0) && dir > (PI / 3.0))
+                || (dir < (-2.0 * PI / 3.0) && dir > (-1.0 * PI / 3.0))
+            {
+                return "-";
+            }
+            if ((dir < PI / 6.0) && (dir > -1.0 * PI / 6.0))
+                || ((dir > 5.0 * PI / 6.0) || (dir < -5.0 * PI / 6.0))
+            {
+                return "|";
+            }
+            if ((dir > PI / 6.0) && (dir < PI / 3.0))
+                || ((dir > -5.0 * PI / 6.0) && (dir < -2.0 * PI / 3.0))
+            {
+                return "/";
+            }
+            if ((dir < -1.0 * PI / 6.0) && (dir > -1.0 * PI / 3.0))
+                || ((dir < 5.0 * PI / 6.0) && (dir > 2.0 * PI / 3.0))
+            {
+                return "\\";
+            }
+        }
+
         let set = match self {
             &CharSet::Ascii => vec![" ", ".", "\"", "+", "o", "?", "#"],
             &CharSet::Numbers => vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
@@ -118,7 +143,7 @@ impl CharSet {
             ],
             &CharSet::Braile => vec!["⠀", "⢀", "⡈", "⡊", "⢕", "⢝", "⣫", "⣟", "⣿"],
         };
-        let id: f32 = brightness * (set.len() - 1) as f32;
+        let id: f32 = pixel.brightness * (set.len() - 1) as f32;
 
         return set[id.round() as usize];
     }
@@ -250,6 +275,7 @@ fn main() {
         args.set,
         args.color,
         args.inverted,
+        args.no_lines,
     );
 
     println!("{}", result);
@@ -268,21 +294,87 @@ fn preprocess_image(image: DynamicImage, lines: bool) -> Vec<Vec<PixelData>> {
     for y in 0..image.height() {
         result.insert(y as usize, vec![]);
         for x in 0..image.width() {
+            // TODO this calls .get_pixel() 9 times as much as it actually needs to be called
+            // 1, 2, 3
+            // 4, 5, 6
+            // 7, 8, 9
+
+            let pix_1 = if !(x == 0 || y == 0) {
+                get_brightness(image.get_pixel(x - 1, y - 1))
+            } else {
+                0.0
+            };
+            let pix_2 = if !(y == 0) {
+                get_brightness(image.get_pixel(x, y - 1))
+            } else {
+                0.0
+            };
+            let pix_3 = if !(x >= image.width() - 1 || y == 0) {
+                get_brightness(image.get_pixel(x + 1, y - 1))
+            } else {
+                0.0
+            };
+            let pix_4 = if !(x == 0) {
+                get_brightness(image.get_pixel(x - 1, y))
+            } else {
+                0.0
+            };
+            let pix_5 = get_brightness(image.get_pixel(x, y));
+            let pix_6 = if !(x >= image.width() - 1) {
+                get_brightness(image.get_pixel(x + 1, y))
+            } else {
+                0.0
+            };
+            let pix_7 = if !(x == 0 || y >= image.height() - 1) {
+                get_brightness(image.get_pixel(x - 1, y + 1))
+            } else {
+                0.0
+            };
+            let pix_8 = if !(y >= image.height() - 1) {
+                get_brightness(image.get_pixel(x, y + 1))
+            } else {
+                0.0
+            };
+            let pix_9 = if !(x >= image.width() - 1 || y >= image.height() - 1) {
+                get_brightness(image.get_pixel(x + 1, y + 1))
+            } else {
+                0.0
+            };
+
+            // convolve
+            let gx = (pix_1)
+                + (pix_3 * -1.0)
+                + (pix_4 * 2.0)
+                + (pix_6 * -2.0)
+                + (pix_7)
+                + (pix_9 * -1.0);
+            let gy = (pix_1)
+                + (pix_7 * -1.0)
+                + (pix_2 * 2.0)
+                + (pix_8 * -2.0)
+                + (pix_3)
+                + (pix_9 * -1.0);
+
             // process
-            let brightness = get_brightness(image.get_pixel(x, y));
+
+            let edgeness = (gx.powi(2) + gy.powi(2)).sqrt();
+            let direction = gy.atan2(gx);
+            // let edgeness = 0.0;
+            // let direction = 0.0;
+            let brightness = pix_5;
 
             // store
             result.get_mut(y as usize).unwrap().insert(
                 x as usize,
                 PixelData {
-                    edgeness: 0.0,
-                    direction: 0.0,
-                    brightness: brightness,
+                    edgeness,
+                    direction,
+                    brightness,
                 },
             );
         }
     }
-    result
+    return result;
 }
 
 fn translate_to_text(
@@ -292,6 +384,7 @@ fn translate_to_text(
     set: CharSet,
     color: ColorSet,
     inverted: bool,
+    no_lines: bool,
 ) -> String {
     let mut result = "".to_string();
 
@@ -310,6 +403,8 @@ fn translate_to_text(
             let pixel =
                 get_center_pixel(&image, pixel_x_min, pixel_x_max, pixel_y_min, pixel_y_max);
 
+            // println!("dir: {}, mag: {}", pixel.direction, pixel.edgeness);
+
             if inverted {
                 // TODO invert brightness value
             }
@@ -319,7 +414,7 @@ fn translate_to_text(
             // TODO color here
             // result += color.get_color_prefix(pixel);
 
-            result += set.get_char(pixel.brightness);
+            result += set.get_char(pixel, no_lines);
         }
         result += "\n";
     }
