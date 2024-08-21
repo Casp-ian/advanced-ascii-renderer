@@ -256,12 +256,10 @@ fn main() {
     }
     let image = img_result.unwrap();
 
-    println!("width: {}, height: {}", image.width(), image.height());
-
     let (columns, rows) = get_cols_and_rows(
         args.character_size,
-        args.width,
         args.height,
+        args.width,
         image.width(),
         image.height(),
     );
