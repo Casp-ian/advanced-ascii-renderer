@@ -139,7 +139,7 @@ pub fn translate_to_text(
             let pixel = get_pixel_data(&image, pixel_x_min, pixel_x_max, pixel_y_min, pixel_y_max);
 
             // TODO color here
-            result += get_color_prefix(&color, pixel.color).as_str();
+            result += get_color_prefix(&color, pixel.color.0).as_str();
 
             // place char in result string
             result += get_char(&set, pixel, inverted, no_lines).as_str();

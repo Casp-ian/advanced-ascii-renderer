@@ -1,125 +1,70 @@
+use std::collections::HashMap;
 use std::f32::consts::PI;
-
-use image::{DynamicImage, GenericImageView, Rgba};
+use std::usize::MAX;
 
 use crate::processing::image::PixelData;
 
 use crate::CharSet;
 use crate::ColorSet;
 
-// TODO find out on what enviorments these work
+// TODO find out on what enviorments these ansi codes work
 const BLACK: &str = "\x1b[30m";
-const DARK_RED: &str = "\x1b[31m";
-const DARK_GREEN: &str = "\x1b[32m";
-const DARK_YELLOW: &str = "\x1b[33m";
-const DARK_BLUE: &str = "\x1b[34m";
-const DARK_MAGENTA: &str = "\x1b[35m";
-const DARK_CYAN: &str = "\x1b[36m";
-const LIGHT_GRAY: &str = "\x1b[37m";
-const DARK_GRAY: &str = "\x1b[90m";
-const RED: &str = "\x1b[91m";
-const GREEN: &str = "\x1b[92m";
-const ORANGE: &str = "\x1b[93m";
-const BLUE: &str = "\x1b[94m";
-const MANGENTA: &str = "\x1b[95m";
-const CYAN: &str = "\x1b[96m";
-const WHITE: &str = "\x1b[97m";
+const RED: &str = "\x1b[31m";
+const GREEN: &str = "\x1b[32m";
+const YELLOW: &str = "\x1b[33m";
+const BLUE: &str = "\x1b[34m";
+const MAGENTA: &str = "\x1b[35m";
+const CYAN: &str = "\x1b[36m";
+const WHITE: &str = "\x1b[37m";
+const GRAY: &str = "\x1b[90m";
+const BRIGHT_RED: &str = "\x1b[91m";
+const BRIGHT_GREEN: &str = "\x1b[92m";
+const BRIGHT_YELLOW: &str = "\x1b[93m";
+const BRIGHT_BLUE: &str = "\x1b[94m";
+const BRIGHT_MANGENTA: &str = "\x1b[95m";
+const BRIGHT_CYAN: &str = "\x1b[96m";
+const BRIGHT_WHITE: &str = "\x1b[97m";
 
-pub fn get_color_prefix(color_set: &ColorSet, pixel: Rgba<u8>) -> String {
-    if color_set == &ColorSet::None {
+pub fn get_color_prefix(color_set: &ColorSet, color: [u8; 4]) -> String {
+    let set: Vec<(&str, [u8; 4])>;
+
+    if color_set == &ColorSet::Simple {
+        set = vec![
+            // (BLACK, [0, 0, 0, 0]),
+            (RED, [170, 0, 0, 0]),
+            (GREEN, [0, 170, 0, 0]),
+            (YELLOW, [170, 170, 0, 0]),
+            (BLUE, [0, 0, 170, 0]),
+            (MAGENTA, [170, 0, 170, 0]),
+            (CYAN, [0, 170, 170, 0]),
+            (WHITE, [170, 170, 170, 0]),
+            (GRAY, [85, 85, 85, 0]),
+            (BRIGHT_RED, [255, 85, 85, 0]),
+            (BRIGHT_GREEN, [85, 255, 85, 0]),
+            (BRIGHT_YELLOW, [255, 255, 85, 0]),
+            (BRIGHT_BLUE, [85, 85, 255, 0]),
+            (BRIGHT_MANGENTA, [255, 85, 255, 0]),
+            (BRIGHT_CYAN, [85, 255, 255, 0]),
+            (BRIGHT_WHITE, [255, 255, 255, 0]),
+        ];
+    } else {
         return "".to_string();
     }
 
-    // TODO MEDIAN CUT ALGORITHM PLEASEEEEE
-    let sRED: [u8; 4] = [255, 0, 0, 0];
-    let sGREEN: [u8; 4] = [0, 255, 0, 0];
-    let sBLUE: [u8; 4] = [0, 0, 255, 0];
-    let sMAGENTA: [u8; 4] = [255, 0, 255, 0];
-    let sCYAN: [u8; 4] = [0, 255, 255, 0];
-    let sYELLOW: [u8; 4] = [255, 255, 0, 0];
-    let sWHITE: [u8; 4] = [255, 255, 255, 0];
-    let sBLACK: [u8; 4] = [0, 0, 0, 0];
+    // i think this will be inverted but the results say otherwise, TODO revisit and make sense of it
+    // let mut lowest_distance: usize = MAX;
+    let mut lowest_distance: usize = 0;
+    let mut chosen_text: &str = "";
 
-    let dRED = get_distance(sRED, pixel.0);
-    let dGREEN = get_distance(sGREEN, pixel.0);
-    let dBLUE = get_distance(sBLUE, pixel.0);
-    let dMAGENTA = get_distance(sMAGENTA, pixel.0);
-    let dCYAN = get_distance(sCYAN, pixel.0);
-    let dYELLOW = get_distance(sYELLOW, pixel.0);
-    let dWHITE = get_distance(sWHITE, pixel.0);
-    let dBLACK = get_distance(sBLACK, pixel.0);
-
-    if dRED >= dGREEN && dRED >= dBLUE && dRED >= dMAGENTA && dRED >= dCYAN && dRED >= dYELLOW
-    // && dRED >= dWHITE
-    // && dRED >= dBLACK
-    {
-        return DARK_RED.to_string();
+    for (text, text_color) in set {
+        let distance = get_distance(color, text_color);
+        if distance > lowest_distance {
+            lowest_distance = distance;
+            chosen_text = text;
+        }
     }
 
-    if dGREEN >= dRED
-        && dGREEN >= dBLUE
-        && dGREEN >= dMAGENTA
-        && dGREEN >= dCYAN
-        && dGREEN >= dYELLOW
-    // && dGREEN >= dWHITE
-    // && dGREEN >= dBLACK
-    {
-        return DARK_GREEN.to_string();
-    }
-    if dBLUE >= dGREEN && dBLUE >= dRED && dBLUE >= dMAGENTA && dBLUE >= dCYAN && dBLUE >= dYELLOW
-    // && dBLUE >= dWHITE
-    // && dBLUE >= dBLACK
-    {
-        return DARK_BLUE.to_string();
-    }
-    if dMAGENTA >= dGREEN
-        && dMAGENTA >= dBLUE
-        && dMAGENTA >= dRED
-        && dMAGENTA >= dCYAN
-        && dMAGENTA >= dYELLOW
-    // && dMAGENTA >= dWHITE
-    // && dMAGENTA >= dBLACK
-    {
-        return DARK_MAGENTA.to_string();
-    }
-    if dCYAN >= dGREEN && dCYAN >= dBLUE && dCYAN >= dMAGENTA && dCYAN >= dRED && dCYAN >= dYELLOW
-    // && dCYAN >= dWHITE
-    // && dCYAN >= dBLACK
-    {
-        return DARK_CYAN.to_string();
-    }
-    if dYELLOW >= dGREEN
-        && dYELLOW >= dBLUE
-        && dYELLOW >= dMAGENTA
-        && dYELLOW >= dCYAN
-        && dYELLOW >= dRED
-    // && dYELLOW >= dWHITE
-    // && dYELLOW >= dBLACK
-    {
-        return DARK_YELLOW.to_string();
-    }
-    // if dWHITE >= dGREEN
-    //     && dWHITE >= dBLUE
-    //     && dWHITE >= dMAGENTA
-    //     && dWHITE >= dCYAN
-    //     && dWHITE >= dRED
-    //     && dWHITE >= dYELLOW
-    //     && dWHITE >= dBLACK
-    // {
-    //     return WHITE.to_string();
-    // }
-    // if dBLACK >= dGREEN
-    //     && dBLACK >= dBLUE
-    //     && dBLACK >= dMAGENTA
-    //     && dBLACK >= dCYAN
-    //     && dBLACK >= dRED
-    //     && dBLACK >= dWHITE
-    //     && dBLACK >= dYELLOW
-    // {
-    //     return BLACK.to_string();
-    // }
-
-    return "".to_string();
+    return chosen_text.to_string();
 }
 
 fn get_distance(one: [u8; 4], two: [u8; 4]) -> usize {
