@@ -47,6 +47,8 @@ pub fn get_color_prefix(color_set: &ColorSet, color: [u8; 4]) -> String {
             (BRIGHT_CYAN, [85, 255, 255, 0]),
             (BRIGHT_WHITE, [255, 255, 255, 0]),
         ];
+    } else if color_set == &ColorSet::Real {
+        return format!("\x1b[38;2;{};{};{}m", color[0], color[1], color[2]).to_string();
     } else {
         return "".to_string();
     }

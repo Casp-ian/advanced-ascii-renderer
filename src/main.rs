@@ -45,6 +45,7 @@ enum ColorSet {
     #[default]
     None,
     Simple,
+    Real,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
