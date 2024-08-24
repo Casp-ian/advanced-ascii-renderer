@@ -3,7 +3,7 @@
 This is a simple command line tool that will turn an image into text.
 
 Usecases could include:
-- Needing to get a gist of what an image contains when in an enviorment where you only have the terminal like when you are ssh'd into a machine.
+- Needing to get an idea of what an image contains when in an enviorment where you only have the terminal like when you are ssh'd into a machine.
 - Sending low resolution images in Discord servers where you dont have image permisions.
 - Fun.
 
