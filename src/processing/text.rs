@@ -1,11 +1,8 @@
-use std::collections::HashMap;
-use std::f32::consts::PI;
-use std::usize::MAX;
-
 use crate::processing::image::PixelData;
 
 use crate::CharSet;
 use crate::ColorSet;
+use crate::Direction;
 
 // TODO find out on what enviorments these ansi codes work
 const BLACK: &str = "\x1b[30m";
@@ -78,28 +75,14 @@ fn get_distance(one: [u8; 4], two: [u8; 4]) -> usize {
 }
 
 // honestly i dont think i had a good reason to put this method inside of the enum, TODO move everything except the char vec
-pub fn get_char(char_set: &CharSet, pixel: &PixelData, inverted: bool, no_lines: bool) -> String {
-    if !no_lines && pixel.edgeness > 0.75 {
-        let dir = pixel.direction;
-        if (dir < (2.0 * PI / 3.0) && dir > (PI / 3.0))
-            || (dir < (-2.0 * PI / 3.0) && dir > (-1.0 * PI / 3.0))
-        {
-            return "-".to_string();
-        }
-        if ((dir < PI / 6.0) && (dir > -1.0 * PI / 6.0))
-            || ((dir > 5.0 * PI / 6.0) || (dir < -5.0 * PI / 6.0))
-        {
-            return "|".to_string();
-        }
-        if ((dir > PI / 6.0) && (dir < PI / 3.0))
-            || ((dir > -5.0 * PI / 6.0) && (dir < -2.0 * PI / 3.0))
-        {
-            return "/".to_string();
-        }
-        if ((dir < -1.0 * PI / 6.0) && (dir > -1.0 * PI / 3.0))
-            || ((dir < 5.0 * PI / 6.0) && (dir > 2.0 * PI / 3.0))
-        {
-            return "\\".to_string();
+pub fn get_char(char_set: &CharSet, pixel: PixelData, inverted: bool, no_lines: bool) -> String {
+    if !no_lines {
+        match pixel.direction {
+            Direction::TopToBottom => return "|".to_string(),
+            Direction::LeftToRight => return "-".to_string(),
+            Direction::TopleftToBotright => return "\\".to_string(),
+            Direction::ToprightToBotleft => return "/".to_string(),
+            _ => (),
         }
     }
 

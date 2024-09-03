@@ -62,7 +62,8 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 
 ## todo (in order)
 - match aspect ratio better by getting data from the terminal
-- improve the line detection [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
+- adjustable line 'thickness'
+- see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
 - take in videos or image streams to display video
 - quantized/limited color set and others (currently the 'simple' color set, but it is ugly and doesnt match the picture)
 - maybe a option to enable a dithering effect??

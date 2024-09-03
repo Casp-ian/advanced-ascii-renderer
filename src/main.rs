@@ -51,8 +51,8 @@ enum ColorSet {
 #[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
 enum CharSet {
     #[default]
-    Braile,
     Ascii,
+    Braile,
     Numbers,
     Discord,
 }
@@ -87,8 +87,6 @@ fn get_cols_and_rows(
         ),
         (None, None) => get_fitting_terminal(char_width, char_height, image_width, image_height),
     };
-
-    println!("columns: {}, rows: {}", columns, rows);
 
     (columns, rows)
 }
@@ -173,5 +171,13 @@ fn main() {
         args.no_lines,
     );
 
+    println!("columns: {}, rows: {}", columns, rows);
+
+    // black background
+    // if args.color != ColorSet::None {
+    println!("\x1b[40m");
+    // }
+
+    // print actual immage
     println!("{}", result);
 }
