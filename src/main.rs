@@ -1,6 +1,8 @@
 use clap::{Parser, ValueEnum};
 use image::io::Reader;
 
+use crossterm::terminal;
+
 mod processing;
 use processing::image::*;
 
@@ -35,19 +37,29 @@ struct Args {
     #[arg(long)]
     no_lines: bool,
 
-    /// the width and height of a character in pixels, only use if the defaults dont suit your needs
-    #[arg(long, num_args(2))]
-    character_size: Option<Vec<u32>>,
+    // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
+    // i do not know how to get these, so for now we have hardcoded defaults
+    /// the width and height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
+    #[arg(long, default_value_t = 10)]
+    char_width: u32,
+
+    /// the width and height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
+    #[arg(long, default_value_t = 18)]
+    char_height: u32,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
 enum ColorSet {
     #[default]
     None,
-    Simple,
+    All,
+    ColorFull,
+    FewColors,
     Real,
 }
 
+// The actual arrays of characters used for the character sets could be stored inside this enum, but i dont think it really matters
+// and if it does its an easy refactor for later, ill just keep it like this so its similar to the color set
 #[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
 enum CharSet {
     #[default]
@@ -58,31 +70,26 @@ enum CharSet {
 }
 
 fn get_cols_and_rows(
-    character_dimensions: Option<Vec<u32>>,
+    char_width: u32,
+    char_height: u32,
     columns: Option<u32>,
     rows: Option<u32>,
     image_width: u32,
     image_height: u32,
 ) -> (u32, u32) {
-    let char_width: u32;
-    let char_height: u32;
-    if let Some(vec) = character_dimensions {
-        char_width = vec.get(0).unwrap().clone();
-        char_height = vec.get(1).unwrap().clone();
-    } else {
-        // TODO default to measured from terminal, if unavailable default to sensible numbers
-        char_width = 10;
-        char_height = 20;
-    }
-
     let (columns, rows) = match (columns, rows) {
-        (Some(x), Some(y)) => (x, y), // take user inputted cols and rows, resolution might be distorted tho
+        (Some(x), Some(y)) => {
+            eprintln!(
+                "you specified both image collumns and rows, image aspect ratio might be messed up"
+            );
+            return (x, y);
+        }
         (Some(x), None) => (
             x,
-            calculate_other_dimension(x, char_height, char_width, image_height, image_width),
+            calculate_other_side_by_aspect(x, char_height, char_width, image_height, image_width),
         ),
         (None, Some(y)) => (
-            calculate_other_dimension(y, char_width, char_height, image_width, image_height),
+            calculate_other_side_by_aspect(y, char_width, char_height, image_width, image_height),
             y,
         ),
         (None, None) => get_fitting_terminal(char_width, char_height, image_width, image_height),
@@ -91,16 +98,16 @@ fn get_cols_and_rows(
     (columns, rows)
 }
 
-// TODO stupid func name, stupid var names
-fn calculate_other_dimension(
-    char1: u32,
-    thicness1: u32,
-    thicness2: u32,
-    image1: u32,
-    image2: u32,
+fn calculate_other_side_by_aspect(
+    x: u32,
+    source_aspect_x: u32,
+    source_aspect_y: u32,
+    target_aspect_x: u32,
+    target_aspect_y: u32,
 ) -> u32 {
-    (char1 * (image2 / thicness2)) / (image1 / thicness1)
-    // TODO decide how i want this rounded or not
+    (x as f32 * (target_aspect_y as f32 / source_aspect_y as f32)
+        / (target_aspect_x as f32 / source_aspect_x as f32))
+        .floor() as u32 //floor or round?
 }
 
 fn get_fitting_terminal(
@@ -109,12 +116,22 @@ fn get_fitting_terminal(
     image_width: u32,
     image_height: u32,
 ) -> (u32, u32) {
-    // TODO get terminal max x and y
-    // TODO this also might not be the best place to get those, maybe in the calling method
-    let max_terminal_chars_x = 213;
-    let max_terminal_chars_y = 55;
+    let max_terminal_chars_x: u32;
+    let max_terminal_chars_y: u32;
 
-    let y_chars = calculate_other_dimension(
+    if let Ok(size) = terminal::size() {
+        max_terminal_chars_x = size.0 as u32;
+        max_terminal_chars_y = size.1 as u32;
+    } else {
+        max_terminal_chars_x = 200;
+        max_terminal_chars_y = 50;
+        eprintln!(
+            "Could not get width and height from terminal, resorting to hardcoded {} by {}",
+            max_terminal_chars_x, max_terminal_chars_y
+        );
+    }
+
+    let y_chars = calculate_other_side_by_aspect(
         max_terminal_chars_x,
         char_width,
         char_height,
@@ -126,7 +143,7 @@ fn get_fitting_terminal(
         return (y_chars, max_terminal_chars_x);
     }
 
-    let x_chars = calculate_other_dimension(
+    let x_chars = calculate_other_side_by_aspect(
         max_terminal_chars_y,
         char_height,
         char_width,
@@ -141,18 +158,19 @@ fn main() {
 
     let reader_result = Reader::open(args.path);
     if reader_result.is_err() {
-        println!("\x1b[33mCannot find image");
+        println!("Cannot find image");
         return;
     }
     let img_result = reader_result.unwrap().decode();
     if img_result.is_err() {
-        println!("\x1b[33mCannot open image");
+        eprintln!("Cannot open image");
         return;
     }
     let image = img_result.unwrap();
 
     let (columns, rows) = get_cols_and_rows(
-        args.character_size,
+        args.char_width,
+        args.char_height,
         args.height,
         args.width,
         image.width(),
@@ -171,13 +189,8 @@ fn main() {
         args.no_lines,
     );
 
-    println!("columns: {}, rows: {}", columns, rows);
+    eprintln!("columns: {}, rows: {}", columns, rows);
 
-    // black background
-    // if args.color != ColorSet::None {
-    println!("\x1b[40m");
-    // }
-
-    // print actual immage
+    // print actual image
     println!("{}", result);
 }

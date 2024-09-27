@@ -4,7 +4,6 @@ use crate::CharSet;
 use crate::ColorSet;
 use crate::Direction;
 
-// TODO find out on what enviorments these ansi codes work
 const BLACK: &str = "\x1b[30m";
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
@@ -22,12 +21,31 @@ const BRIGHT_MANGENTA: &str = "\x1b[95m";
 const BRIGHT_CYAN: &str = "\x1b[96m";
 const BRIGHT_WHITE: &str = "\x1b[97m";
 
-pub fn get_color_prefix(color_set: &ColorSet, color: [u8; 4]) -> String {
+pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 4]) -> String {
     let set: Vec<(&str, [u8; 4])>;
 
-    if color_set == &ColorSet::Simple {
+    if color_set == &ColorSet::ColorFull {
         set = vec![
             // (BLACK, [0, 0, 0, 0]),
+            (RED, [170, 0, 0, 0]),
+            (GREEN, [0, 170, 0, 0]),
+            (YELLOW, [170, 170, 0, 0]),
+            (BLUE, [0, 0, 170, 0]),
+            (MAGENTA, [170, 0, 170, 0]),
+            (CYAN, [0, 170, 170, 0]),
+            // (WHITE, [170, 170, 170, 0]),
+            // (GRAY, [85, 85, 85, 0]),
+            (BRIGHT_RED, [255, 85, 85, 0]),
+            (BRIGHT_GREEN, [85, 255, 85, 0]),
+            (BRIGHT_YELLOW, [255, 255, 85, 0]),
+            (BRIGHT_BLUE, [85, 85, 255, 0]),
+            (BRIGHT_MANGENTA, [255, 85, 255, 0]),
+            (BRIGHT_CYAN, [85, 255, 255, 0]),
+            // (BRIGHT_WHITE, [255, 255, 255, 0]),
+        ];
+    } else if color_set == &ColorSet::All {
+        set = vec![
+            (BLACK, [0, 0, 0, 0]),
             (RED, [170, 0, 0, 0]),
             (GREEN, [0, 170, 0, 0]),
             (YELLOW, [170, 170, 0, 0]),
@@ -44,14 +62,32 @@ pub fn get_color_prefix(color_set: &ColorSet, color: [u8; 4]) -> String {
             (BRIGHT_CYAN, [85, 255, 255, 0]),
             (BRIGHT_WHITE, [255, 255, 255, 0]),
         ];
+    } else if color_set == &ColorSet::FewColors {
+        set = vec![
+            // (BLACK, [0, 0, 0, 0]),
+            // (RED, [170, 0, 0, 0]),
+            // (GREEN, [0, 170, 0, 0]),
+            // (YELLOW, [170, 170, 0, 0]),
+            // (BLUE, [0, 0, 170, 0]),
+            // (MAGENTA, [170, 0, 170, 0]),
+            // (CYAN, [0, 170, 170, 0]),
+            (WHITE, [170, 170, 170, 0]),
+            // (GRAY, [85, 85, 85, 0]),
+            (BRIGHT_RED, [255, 85, 85, 0]),
+            (BRIGHT_GREEN, [85, 255, 85, 0]),
+            (BRIGHT_YELLOW, [255, 255, 85, 0]),
+            (BRIGHT_BLUE, [85, 85, 255, 0]),
+            (BRIGHT_MANGENTA, [255, 85, 255, 0]),
+            (BRIGHT_CYAN, [85, 255, 255, 0]),
+            // (BRIGHT_WHITE, [255, 255, 255, 0]),
+        ];
     } else if color_set == &ColorSet::Real {
         return format!("\x1b[38;2;{};{};{}m", color[0], color[1], color[2]).to_string();
     } else {
         return "".to_string();
     }
 
-    // i think this will be inverted but the results say otherwise, TODO revisit and make sense of it
-    // let mut lowest_distance: usize = MAX;
+    // TODO this color quantization method sucks balls, maybe acerola can save us here as well https://www.youtube.com/watch?v=fv-wlo8yVhk
     let mut lowest_distance: usize = 0;
     let mut chosen_text: &str = "";
 
@@ -74,7 +110,6 @@ fn get_distance(one: [u8; 4], two: [u8; 4]) -> usize {
     return distance.sqrt() as usize;
 }
 
-// honestly i dont think i had a good reason to put this method inside of the enum, TODO move everything except the char vec
 pub fn get_char(char_set: &CharSet, pixel: PixelData, inverted: bool, no_lines: bool) -> String {
     if !no_lines {
         match pixel.direction {
@@ -98,6 +133,7 @@ pub fn get_char(char_set: &CharSet, pixel: PixelData, inverted: bool, no_lines: 
         ],
         &CharSet::Braile => vec!["⠀", "⢀", "⡈", "⡊", "⢕", "⢝", "⣫", "⣟", "⣿"],
     };
+
     let brightness = if inverted {
         1.0 - pixel.brightness
     } else {

@@ -5,8 +5,8 @@ use image::{DynamicImage, GenericImageView, Rgba};
 use crate::CharSet;
 use crate::ColorSet;
 
+use crate::processing::text::get_ansi_color_code;
 use crate::processing::text::get_char;
-use crate::processing::text::get_color_prefix;
 
 #[derive(Clone)]
 pub struct PixelData {
@@ -176,8 +176,7 @@ pub fn translate_to_text(
             // TODO dont only get the center pixel, look at all pixels to decide the character, like in acerola's video
             let pixel = get_pixel_data(&image, pixel_x_min, pixel_x_max, pixel_y_min, pixel_y_max);
 
-            // TODO color here
-            result += get_color_prefix(&color, pixel.color.0).as_str();
+            result += get_ansi_color_code(&color, pixel.color.0).as_str();
 
             // place char in result string
             result += get_char(&set, pixel, inverted, no_lines).as_str();
