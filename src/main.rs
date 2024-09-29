@@ -1,10 +1,15 @@
+use std::fmt::Debug;
+
 use clap::{Parser, ValueEnum};
-use image::io::Reader;
+use image::{io::Reader, DynamicImage};
 
 use crossterm::terminal;
 
 mod processing;
 use processing::image::*;
+
+use std::process::Command;
+// use processing::video::*;
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
@@ -48,7 +53,7 @@ struct Args {
     char_height: u32,
 }
 
-#[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
 enum ColorSet {
     #[default]
     None,
@@ -60,7 +65,7 @@ enum ColorSet {
 
 // The actual arrays of characters used for the character sets could be stored inside this enum, but i dont think it really matters
 // and if it does its an easy refactor for later, ill just keep it like this so its similar to the color set
-#[derive(ValueEnum, Clone, Debug, Default, PartialEq)]
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
 enum CharSet {
     #[default]
     Ascii,
@@ -156,18 +161,55 @@ fn get_fitting_terminal(
 fn main() {
     let args = Args::parse();
 
-    let reader_result = Reader::open(args.path);
+    // TRY IMAGE =====
+    let reader_result = Reader::open(&args.path);
     if reader_result.is_err() {
-        println!("Cannot find image");
+        eprintln!("Cannot find file");
         return;
     }
     let img_result = reader_result.unwrap().decode();
-    if img_result.is_err() {
-        eprintln!("Cannot open image");
-        return;
-    }
-    let image = img_result.unwrap();
 
+    if let Ok(image) = img_result {
+        println!("{}", do_image_stuff(image, &args));
+        return;
+    } else {
+        eprintln!("Cannot open as an image");
+        // TODO does the reader_result memmory get cleared???
+    }
+
+    // TRY VIDEO =====
+
+    // maybe create an option to disable trying as video, but it doesnt really matter
+    eprintln!("Trying to open as a video");
+
+    let intermediate_output = "output.jpg";
+    for i in 0..5 {
+        let quality = "5"; //nothig wrong with this being a string, as this will come from the user input later anyways
+        let command_result = Command::new("ffmpeg")
+            .arg("-y")
+            .args(["-ss", &i.to_string()])
+            .args(["-i", &args.path.to_str().unwrap()])
+            .args(["-q:v", quality])
+            .args(["-frames:v", "1"])
+            .arg(intermediate_output)
+            .output();
+
+        if let Ok(good) = command_result {
+            let reader_result = Reader::open(intermediate_output);
+            if reader_result.is_err() {
+                eprintln!("Cannot find file");
+                return;
+            }
+            let img_result = reader_result.unwrap().decode();
+            println!("{}", do_image_stuff(img_result.unwrap(), &args));
+        }
+    }
+
+    let _ = Command::new("rm").arg(intermediate_output).output();
+    // TODO delete intermedia output
+}
+
+fn do_image_stuff(image: DynamicImage, args: &Args) -> String {
     let (columns, rows) = get_cols_and_rows(
         args.char_width,
         args.char_height,
@@ -176,6 +218,7 @@ fn main() {
         image.width(),
         image.height(),
     );
+    eprintln!("columns: {}, rows: {}", columns, rows);
 
     let pixel_info = process_image(image);
 
@@ -189,8 +232,6 @@ fn main() {
         args.no_lines,
     );
 
-    eprintln!("columns: {}, rows: {}", columns, rows);
-
     // print actual image
-    println!("{}", result);
+    return result;
 }
