@@ -61,8 +61,11 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - color (use the 'real' color set)
 
 ## todo (in order)
+- take in videos to display video
+- GPU!!!
 - adjustable line 'thickness'
 - see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
-- take in videos or image streams to display video
+- improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
 - improve color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
-- maybe a option to enable a dithering effect??
+- take in streams of images to display video (i dont know how streams work)
+- maybe a option to enable a dithering effect?? (both in color and in character seperately)

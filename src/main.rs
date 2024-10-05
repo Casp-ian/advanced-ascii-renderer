@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, time::Instant};
 
 use clap::{Parser, ValueEnum};
 use image::{io::Reader, DynamicImage};
@@ -7,6 +7,7 @@ use crossterm::terminal;
 
 mod processing;
 use processing::image::*;
+use processing::text::*;
 
 use std::process::Command;
 // use processing::video::*;
@@ -126,7 +127,7 @@ fn get_fitting_terminal(
 
     if let Ok(size) = terminal::size() {
         max_terminal_chars_x = size.0 as u32;
-        max_terminal_chars_y = size.1 as u32;
+        max_terminal_chars_y = size.1 as u32 - 3; // minus 3 to adjust for prompt size, maybe we can actually get that prompt height somehow, but well try later
     } else {
         max_terminal_chars_x = 200;
         max_terminal_chars_y = 50;
@@ -182,31 +183,129 @@ fn main() {
     // maybe create an option to disable trying as video, but it doesnt really matter
     eprintln!("Trying to open as a video");
 
+    do_video_stuff(&args);
+}
+
+fn do_video_stuff(args: &Args) {
     let intermediate_output = "output.jpg";
-    for i in 0..5 {
-        let quality = "5"; //nothig wrong with this being a string, as this will come from the user input later anyways
+
+    let command_result = Command::new("ffprobe")
+        .args(["-i", &args.path.to_str().unwrap()])
+        .args(["-show_entries", "format=duration"])
+        .args(["-v", "quiet"])
+        .args(["-of", "default=noprint_wrappers=1:nokey=1"])
+        .output();
+
+    if let Err(error) = command_result {
+        eprintln!("probably couldnt find ffmprobe (often installed with ffmpeg) on your system");
+        eprintln!("{}", error);
+        return;
+    }
+
+    // TODO allow user to decide this
+    let quality = "5"; //nothig wrong with this being a string, as this will come from the user input later anyways
+    let start_time = Instant::now();
+    let length = String::from_utf8(command_result.unwrap().stdout)
+        .unwrap()
+        .replace("\n", "")
+        .parse::<f32>()
+        .unwrap();
+
+    let command_result = Command::new("ffmpeg")
+        .arg("-y")
+        .args([
+            "-ss",
+            start_time.elapsed().as_secs_f32().to_string().as_str(),
+        ])
+        .args(["-i", &args.path.to_str().unwrap()])
+        .args(["-q:v", quality])
+        .args(["-frames:v", "1"])
+        .arg(intermediate_output)
+        .output();
+
+    if let Err(error) = command_result {
+        eprintln!("probably couldnt find ffmpeg on your system");
+        eprintln!("{}", error);
+        return;
+    }
+    let reader_result = Reader::open(intermediate_output);
+    if reader_result.is_err() {
+        eprintln!("Cannot find file");
+        return;
+    }
+    let image = reader_result.unwrap().decode().unwrap();
+    let (columns, rows) = get_cols_and_rows(
+        args.char_width,
+        args.char_height,
+        args.height,
+        args.width,
+        image.width(),
+        image.height(),
+    );
+    eprintln!("columns: {}, rows: {}", columns, rows);
+    let pixel_info = process_image(image);
+
+    let result = translate_to_text(
+        pixel_info,
+        columns,
+        rows,
+        args.set,
+        args.color,
+        args.inverted,
+        args.no_lines,
+    );
+
+    // print actual image
+    println!("{}", result);
+    // TODO move up the amount of rows calculated, this still does not work, i think because you cant move up more than the terminal height
+    println!("\x1b[{}A", rows);
+
+    loop {
+        if length < start_time.elapsed().as_secs_f32() {
+            break;
+        }
+
         let command_result = Command::new("ffmpeg")
             .arg("-y")
-            .args(["-ss", &i.to_string()])
+            .args([
+                "-ss",
+                start_time.elapsed().as_secs_f32().to_string().as_str(),
+            ])
             .args(["-i", &args.path.to_str().unwrap()])
             .args(["-q:v", quality])
             .args(["-frames:v", "1"])
             .arg(intermediate_output)
             .output();
 
-        if let Ok(good) = command_result {
+        if command_result.is_ok() {
             let reader_result = Reader::open(intermediate_output);
             if reader_result.is_err() {
                 eprintln!("Cannot find file");
                 return;
             }
-            let img_result = reader_result.unwrap().decode();
-            println!("{}", do_image_stuff(img_result.unwrap(), &args));
+            let image = reader_result.unwrap().decode().unwrap();
+            let pixel_info = process_image(image);
+
+            let result = translate_to_text(
+                pixel_info,
+                columns,
+                rows,
+                args.set,
+                args.color,
+                args.inverted,
+                args.no_lines,
+            );
+
+            // print actual image
+            println!("{}", result);
+
+            // TODO move up the amount of rows calculated, this still does not work, i think because you cant move up more than the terminal height
+            println!("\x1b[{}A", rows);
         }
     }
 
+    // TODO if the command gets terminated, the intermediate output does not get cleaned up
     let _ = Command::new("rm").arg(intermediate_output).output();
-    // TODO delete intermedia output
 }
 
 fn do_image_stuff(image: DynamicImage, args: &Args) -> String {
