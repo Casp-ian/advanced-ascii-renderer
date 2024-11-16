@@ -59,65 +59,65 @@ pub fn translate_to_text(
     return result;
 }
 
-pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 4]) -> String {
-    let set: Vec<(&str, [u8; 4])>;
+pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 3]) -> String {
+    let set: Vec<(&str, [u8; 3])>;
 
     if color_set == &ColorSet::ColorFull {
         set = vec![
-            // (BLACK, [0, 0, 0, 0]),
-            (RED, [170, 0, 0, 0]),
-            (GREEN, [0, 170, 0, 0]),
-            (YELLOW, [170, 170, 0, 0]),
-            (BLUE, [0, 0, 170, 0]),
-            (MAGENTA, [170, 0, 170, 0]),
-            (CYAN, [0, 170, 170, 0]),
-            // (WHITE, [170, 170, 170, 0]),
-            // (GRAY, [85, 85, 85, 0]),
-            (BRIGHT_RED, [255, 85, 85, 0]),
-            (BRIGHT_GREEN, [85, 255, 85, 0]),
-            (BRIGHT_YELLOW, [255, 255, 85, 0]),
-            (BRIGHT_BLUE, [85, 85, 255, 0]),
-            (BRIGHT_MANGENTA, [255, 85, 255, 0]),
-            (BRIGHT_CYAN, [85, 255, 255, 0]),
-            // (BRIGHT_WHITE, [255, 255, 255, 0]),
+            // (BLACK, [0, 0, 0]),
+            (RED, [170, 0, 0]),
+            (GREEN, [0, 170, 0]),
+            (YELLOW, [170, 170, 0]),
+            (BLUE, [0, 0, 170]),
+            (MAGENTA, [170, 0, 170]),
+            (CYAN, [0, 170, 170]),
+            // (WHITE, [170, 170, 170]),
+            // (GRAY, [85, 85, 85]),
+            (BRIGHT_RED, [255, 85, 85]),
+            (BRIGHT_GREEN, [85, 255, 85]),
+            (BRIGHT_YELLOW, [255, 255, 85]),
+            (BRIGHT_BLUE, [85, 85, 255]),
+            (BRIGHT_MANGENTA, [255, 85, 255]),
+            (BRIGHT_CYAN, [85, 255, 255]),
+            // (BRIGHT_WHITE, [255, 255, 255]),
         ];
     } else if color_set == &ColorSet::All {
         set = vec![
-            (BLACK, [0, 0, 0, 0]),
-            (RED, [170, 0, 0, 0]),
-            (GREEN, [0, 170, 0, 0]),
-            (YELLOW, [170, 170, 0, 0]),
-            (BLUE, [0, 0, 170, 0]),
-            (MAGENTA, [170, 0, 170, 0]),
-            (CYAN, [0, 170, 170, 0]),
-            (WHITE, [170, 170, 170, 0]),
-            (GRAY, [85, 85, 85, 0]),
-            (BRIGHT_RED, [255, 85, 85, 0]),
-            (BRIGHT_GREEN, [85, 255, 85, 0]),
-            (BRIGHT_YELLOW, [255, 255, 85, 0]),
-            (BRIGHT_BLUE, [85, 85, 255, 0]),
-            (BRIGHT_MANGENTA, [255, 85, 255, 0]),
-            (BRIGHT_CYAN, [85, 255, 255, 0]),
-            (BRIGHT_WHITE, [255, 255, 255, 0]),
+            (BLACK, [0, 0, 0]),
+            (RED, [170, 0, 0]),
+            (GREEN, [0, 170, 0]),
+            (YELLOW, [170, 170, 0]),
+            (BLUE, [0, 0, 170]),
+            (MAGENTA, [170, 0, 170]),
+            (CYAN, [0, 170, 170]),
+            (WHITE, [170, 170, 170]),
+            (GRAY, [85, 85, 85]),
+            (BRIGHT_RED, [255, 85, 85]),
+            (BRIGHT_GREEN, [85, 255, 85]),
+            (BRIGHT_YELLOW, [255, 255, 85]),
+            (BRIGHT_BLUE, [85, 85, 255]),
+            (BRIGHT_MANGENTA, [255, 85, 255]),
+            (BRIGHT_CYAN, [85, 255, 255]),
+            (BRIGHT_WHITE, [255, 255, 255]),
         ];
     } else if color_set == &ColorSet::FewColors {
         set = vec![
-            // (BLACK, [0, 0, 0, 0]),
-            // (RED, [170, 0, 0, 0]),
-            // (GREEN, [0, 170, 0, 0]),
-            // (YELLOW, [170, 170, 0, 0]),
-            // (BLUE, [0, 0, 170, 0]),
-            // (MAGENTA, [170, 0, 170, 0]),
-            // (CYAN, [0, 170, 170, 0]),
-            (WHITE, [170, 170, 170, 0]),
-            // (GRAY, [85, 85, 85, 0]),
-            (BRIGHT_RED, [255, 85, 85, 0]),
-            (BRIGHT_GREEN, [85, 255, 85, 0]),
-            (BRIGHT_YELLOW, [255, 255, 85, 0]),
-            (BRIGHT_BLUE, [85, 85, 255, 0]),
-            (BRIGHT_MANGENTA, [255, 85, 255, 0]),
-            (BRIGHT_CYAN, [85, 255, 255, 0]),
-            // (BRIGHT_WHITE, [255, 255, 255, 0]),
+            // (BLACK, [0, 0, 0]),
+            // (RED, [170, 0, 0]),
+            // (GREEN, [0, 170, 0]),
+            // (YELLOW, [170, 170, 0]),
+            // (BLUE, [0, 0, 170]),
+            // (MAGENTA, [170, 0, 170]),
+            // (CYAN, [0, 170, 170]),
+            (WHITE, [170, 170, 170]),
+            // (GRAY, [85, 85, 85]),
+            (BRIGHT_RED, [255, 85, 85]),
+            (BRIGHT_GREEN, [85, 255, 85]),
+            (BRIGHT_YELLOW, [255, 255, 85]),
+            (BRIGHT_BLUE, [85, 85, 255]),
+            (BRIGHT_MANGENTA, [255, 85, 255]),
+            (BRIGHT_CYAN, [85, 255, 255]),
+            // (BRIGHT_WHITE, [255, 255, 255]),
         ];
     } else if color_set == &ColorSet::Real {
         return format!("\x1b[38;2;{};{};{}m", color[0], color[1], color[2]).to_string();
@@ -140,11 +140,9 @@ pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 4]) -> String {
     return chosen_text.to_string();
 }
 
-fn get_distance(one: [u8; 4], two: [u8; 4]) -> usize {
-    let distance = ((one[0] + two[0]).pow(2)
-        + (one[1] + two[1]).pow(2)
-        + (one[2] + two[2]).pow(2)
-        + (one[3] + two[3]).pow(2)) as f32;
+fn get_distance(one: [u8; 3], two: [u8; 3]) -> usize {
+    let distance =
+        ((one[0] + two[0]).pow(2) + (one[1] + two[1]).pow(2) + (one[2] + two[2]).pow(2)) as f32;
     return distance.sqrt() as usize;
 }
 

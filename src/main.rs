@@ -243,7 +243,7 @@ fn do_video_stuff(args: &Args) {
         image.height(),
     );
     eprintln!("columns: {}, rows: {}", columns, rows);
-    let pixel_info = process_image(image);
+    let pixel_info = process_image(image, columns, rows, args);
 
     let result = translate_to_text(
         pixel_info,
@@ -284,7 +284,7 @@ fn do_video_stuff(args: &Args) {
                 return;
             }
             let image = reader_result.unwrap().decode().unwrap();
-            let pixel_info = process_image(image);
+            let pixel_info = process_image(image, columns, rows, args);
 
             let result = translate_to_text(
                 pixel_info,
@@ -319,7 +319,7 @@ fn do_image_stuff(image: DynamicImage, args: &Args) -> String {
     );
     eprintln!("columns: {}, rows: {}", columns, rows);
 
-    let pixel_info = process_image(image);
+    let pixel_info = process_image(image, columns, rows, args);
 
     let result = translate_to_text(
         pixel_info,

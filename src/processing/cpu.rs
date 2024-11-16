@@ -1,121 +1,133 @@
-use crate::processing::image::*;
-use image::{DynamicImage, GenericImageView, Rgba};
+use crate::{processing::image::*, Args};
+use image::{DynamicImage, GenericImageView, Pixel, Rgba};
 use std::f32::consts::PI;
 
 // this will no doubt use a lot of memory, no clue what to do about it tho :p
-pub fn process_on_cpu(image: DynamicImage) -> Vec<Vec<PixelData>> {
-    let edge_magnitude_threshold = 0.75;
-    let mut result: Vec<Vec<PixelData>> = vec![];
+pub fn process_on_cpu(
+    image: DynamicImage,
+    width: u32,
+    height: u32,
+    args: &Args,
+) -> Vec<Vec<PixelData>> {
+    let pixels_per_char: u32 = 5; //TODO make this not ugly
+    let resized_image = image.resize(
+        width * pixels_per_char,
+        height * pixels_per_char,
+        image::imageops::FilterType::Triangle,
+    ); // TODO
 
-    for y in 0..image.height() {
+    let edge_magnitude_threshold = 1.0; // TODO make in args
+    let mut result: Vec<Vec<PixelData>> = vec![]; // Change to slices because we have width and height of output now
+
+    for y in 0..resized_image.height() {
         result.insert(y as usize, vec![]);
-        for x in 0..image.width() {
-            // this calls .get_pixel() 9 times as much as it actually needs to be called, dont think it is avoidable or really bad tho
-            // 1, 2, 3
-            // 4, 5, 6
-            // 7, 8, 9
-
-            let center = image.get_pixel(x, y);
-
-            let pix_1 = if !(x == 0 || y == 0) {
-                get_brightness(image.get_pixel(x - 1, y - 1))
-            } else {
-                0.0
-            };
-            let pix_2 = if !(y == 0) {
-                get_brightness(image.get_pixel(x, y - 1))
-            } else {
-                0.0
-            };
-            let pix_3 = if !(x >= image.width() - 1 || y == 0) {
-                get_brightness(image.get_pixel(x + 1, y - 1))
-            } else {
-                0.0
-            };
-            let pix_4 = if !(x == 0) {
-                get_brightness(image.get_pixel(x - 1, y))
-            } else {
-                0.0
-            };
-            let pix_5 = get_brightness(center);
-            let pix_6 = if !(x >= image.width() - 1) {
-                get_brightness(image.get_pixel(x + 1, y))
-            } else {
-                0.0
-            };
-            let pix_7 = if !(x == 0 || y >= image.height() - 1) {
-                get_brightness(image.get_pixel(x - 1, y + 1))
-            } else {
-                0.0
-            };
-            let pix_8 = if !(y >= image.height() - 1) {
-                get_brightness(image.get_pixel(x, y + 1))
-            } else {
-                0.0
-            };
-            let pix_9 = if !(x >= image.width() - 1 || y >= image.height() - 1) {
-                get_brightness(image.get_pixel(x + 1, y + 1))
-            } else {
-                0.0
-            };
-
-            // convolve
-            let gx = (pix_1)
-                + (pix_3 * -1.0)
-                + (pix_4 * 2.0)
-                + (pix_6 * -2.0)
-                + (pix_7)
-                + (pix_9 * -1.0);
-            let gy = (pix_1)
-                + (pix_7 * -1.0)
-                + (pix_2 * 2.0)
-                + (pix_8 * -2.0)
-                + (pix_3)
-                + (pix_9 * -1.0);
-
-            // process
-            let edge_magnitude = (gx.powi(2) + gy.powi(2)).sqrt();
-            let edge_direction = gy.atan2(gx);
-            let brightness = pix_5;
-
-            let direction: Direction;
-            if edge_magnitude > edge_magnitude_threshold {
-                let dir = edge_direction;
-                if (dir < (2.0 * PI / 3.0) && dir > (PI / 3.0))
-                    || (dir < (-2.0 * PI / 3.0) && dir > (-1.0 * PI / 3.0))
-                {
-                    direction = Direction::LeftToRight;
-                } else if ((dir < PI / 6.0) && (dir > -1.0 * PI / 6.0))
-                    || ((dir > 5.0 * PI / 6.0) || (dir < -5.0 * PI / 6.0))
-                {
-                    direction = Direction::TopToBottom;
-                } else if ((dir > PI / 6.0) && (dir < PI / 3.0))
-                    || ((dir > -5.0 * PI / 6.0) && (dir < -2.0 * PI / 3.0))
-                {
-                    direction = Direction::ToprightToBotleft;
-                } else if ((dir < -1.0 * PI / 6.0) && (dir > -1.0 * PI / 3.0))
-                    || ((dir < 5.0 * PI / 6.0) && (dir > 2.0 * PI / 3.0))
-                {
-                    direction = Direction::TopleftToBotright;
-                } else {
-                    direction = Direction::None;
-                }
-            } else {
-                direction = Direction::None;
-            }
-
-            // store
-            result.get_mut(y as usize).unwrap().insert(
-                x as usize,
-                PixelData {
-                    direction,
-                    brightness,
-                    color: center,
-                },
-            );
+        for x in 0..resized_image.width() {
+            convolute(&resized_image, x, y, edge_magnitude_threshold, &mut result);
         }
     }
     return result;
+}
+
+fn convolute(
+    image: &DynamicImage,
+    x: u32,
+    y: u32,
+    edge_magnitude_threshold: f32,
+    result: &mut Vec<Vec<PixelData>>,
+) {
+    // this calls .get_pixel() 9 times as much as it actually needs to be called, dont think it is avoidable or really bad tho
+    // 1, 2, 3
+    // 4, 5, 6
+    // 7, 8, 9
+
+    let center = image.get_pixel(x, y);
+
+    let pix_1 = if !(x == 0 || y == 0) {
+        get_brightness(image.get_pixel(x - 1, y - 1))
+    } else {
+        0.0
+    };
+    let pix_2 = if !(y == 0) {
+        get_brightness(image.get_pixel(x, y - 1))
+    } else {
+        0.0
+    };
+    let pix_3 = if !(x >= image.width() - 1 || y == 0) {
+        get_brightness(image.get_pixel(x + 1, y - 1))
+    } else {
+        0.0
+    };
+    let pix_4 = if !(x == 0) {
+        get_brightness(image.get_pixel(x - 1, y))
+    } else {
+        0.0
+    };
+    let pix_5 = get_brightness(center);
+    let pix_6 = if !(x >= image.width() - 1) {
+        get_brightness(image.get_pixel(x + 1, y))
+    } else {
+        0.0
+    };
+    let pix_7 = if !(x == 0 || y >= image.height() - 1) {
+        get_brightness(image.get_pixel(x - 1, y + 1))
+    } else {
+        0.0
+    };
+    let pix_8 = if !(y >= image.height() - 1) {
+        get_brightness(image.get_pixel(x, y + 1))
+    } else {
+        0.0
+    };
+    let pix_9 = if !(x >= image.width() - 1 || y >= image.height() - 1) {
+        get_brightness(image.get_pixel(x + 1, y + 1))
+    } else {
+        0.0
+    };
+
+    // convolve
+    let gx = (pix_1) + (pix_3 * -1.0) + (pix_4 * 2.0) + (pix_6 * -2.0) + (pix_7) + (pix_9 * -1.0);
+    let gy = (pix_1) + (pix_7 * -1.0) + (pix_2 * 2.0) + (pix_8 * -2.0) + (pix_3) + (pix_9 * -1.0);
+
+    // process
+    let edge_magnitude = (gx.powi(2) + gy.powi(2)).sqrt();
+    let edge_direction = gy.atan2(gx);
+    let brightness = pix_5;
+
+    let direction: Direction;
+    if edge_magnitude > edge_magnitude_threshold {
+        let dir = edge_direction;
+        if (dir < (2.0 * PI / 3.0) && dir > (PI / 3.0))
+            || (dir < (-2.0 * PI / 3.0) && dir > (-1.0 * PI / 3.0))
+        {
+            direction = Direction::LeftToRight;
+        } else if ((dir < PI / 6.0) && (dir > -1.0 * PI / 6.0))
+            || ((dir > 5.0 * PI / 6.0) || (dir < -5.0 * PI / 6.0))
+        {
+            direction = Direction::TopToBottom;
+        } else if ((dir > PI / 6.0) && (dir < PI / 3.0))
+            || ((dir > -5.0 * PI / 6.0) && (dir < -2.0 * PI / 3.0))
+        {
+            direction = Direction::ToprightToBotleft;
+        } else if ((dir < -1.0 * PI / 6.0) && (dir > -1.0 * PI / 3.0))
+            || ((dir < 5.0 * PI / 6.0) && (dir > 2.0 * PI / 3.0))
+        {
+            direction = Direction::TopleftToBotright;
+        } else {
+            direction = Direction::None;
+        }
+    } else {
+        direction = Direction::None;
+    }
+
+    // store
+    result.get_mut(y as usize).unwrap().insert(
+        x as usize,
+        PixelData {
+            direction,
+            brightness,
+            color: center.to_rgb(),
+        },
+    );
 }
 
 // returns brightness between 0 and 1
