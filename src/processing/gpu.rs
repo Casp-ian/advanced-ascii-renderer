@@ -294,6 +294,7 @@ impl WgpuContext {
 
             // TODO workgroup count https://blog.redwarp.app/image-filters/
             // Number of cells to run, the (x,y,z) size of item being processed
+            // TODO this should be output, not input... i think
             compute_pass.dispatch_workgroups(*input_texture_width, *input_texture_height, 1);
             // TODO fucked according to tutorial
         }
@@ -356,7 +357,7 @@ pub fn try_process_on_gpu(
     width: u32,
     height: u32,
     args: &Args,
-) -> Result<&[&[PixelData]], &str> {
+) -> Result<Vec<Vec<PixelData>>, &str> {
     // TODO do i have to be unsafe? i think its fine tho
     if unsafe { CONTEXT.failed } {
         return Err("failed before, not retrying");
@@ -372,8 +373,9 @@ pub fn try_process_on_gpu(
     match compute_result {
         Ok(data) => {
             println!("gpu returned {:?}", data);
+            println!("{} to {}", data.len(), width);
             // TODO actually return
-            return Ok(&[]);
+            return Ok(vec![]);
         }
         Err(message) => return Err(message),
     }

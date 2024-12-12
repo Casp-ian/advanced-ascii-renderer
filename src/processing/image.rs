@@ -20,7 +20,12 @@ pub enum Direction {
     LeftToRight,
 }
 
-pub fn process_image(image: DynamicImage, width: u32, height: u32, args: &Args) -> &[&[PixelData]] {
+pub fn process_image(
+    image: DynamicImage,
+    width: u32,
+    height: u32,
+    args: &Args,
+) -> Vec<Vec<PixelData>> {
     match try_process_on_gpu(image.clone(), width, height, args) {
         Ok(data) => return data,
         Err(err) => {
@@ -28,7 +33,7 @@ pub fn process_image(image: DynamicImage, width: u32, height: u32, args: &Args) 
             eprintln!("gpu failed, trying cpu");
         }
     }
-    return &[];
+    return vec![];
 
     // FIXME disable cpu for now, i dont want to keep parity
     // return process_on_cpu(image.clone(), width, height, args);

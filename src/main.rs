@@ -1,16 +1,16 @@
+use std::io;
 use std::{fmt::Debug, time::Instant};
 
 use clap::{Parser, ValueEnum};
 use image::{io::Reader, DynamicImage};
 
-use crossterm::terminal;
+use crossterm::terminal::{self, Clear, EnterAlternateScreen, LeaveAlternateScreen};
 
 mod processing;
 use processing::image::*;
 use processing::text::*;
 
 use std::process::Command;
-// use processing::video::*;
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
@@ -183,7 +183,9 @@ fn main() {
     // maybe create an option to disable trying as video, but it doesnt really matter
     eprintln!("Trying to open as a video");
 
+    crossterm::execute!(io::stdout(), EnterAlternateScreen);
     do_video_stuff(&args);
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
 fn do_video_stuff(args: &Args) {
@@ -255,10 +257,9 @@ fn do_video_stuff(args: &Args) {
         args.no_lines,
     );
 
+    crossterm::execute!(io::stdout(), Clear(terminal::ClearType::All));
     // print actual image
     println!("{}", result);
-    // TODO move up the amount of rows calculated, this still does not work, i think because you cant move up more than the terminal height
-    println!("\x1b[{}A", rows);
 
     loop {
         if length < start_time.elapsed().as_secs_f32() {
