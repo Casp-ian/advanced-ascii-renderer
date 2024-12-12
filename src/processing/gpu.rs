@@ -11,8 +11,7 @@ struct WgpuContext {
     pipeline: Option<wgpu::ComputePipeline>,
     bind_group: Option<wgpu::BindGroup>,
     input_texture: Option<wgpu::Texture>,
-    output_texture: Option<wgpu::Texture>,
-    output_storage_buffer: Option<wgpu::Buffer>,
+    output_storage_texture: Option<wgpu::Texture>,
     output_staging_buffer: Option<wgpu::Buffer>,
     input_texture_width: Option<u32>,
     input_texture_height: Option<u32>,
@@ -31,8 +30,7 @@ impl WgpuContext {
             pipeline: None,
             bind_group: None,
             input_texture: None,
-            output_texture: None,
-            output_storage_buffer: None,
+            output_storage_texture: None,
             output_staging_buffer: None,
             input_texture_width: None,
             input_texture_height: None,
@@ -47,7 +45,7 @@ impl WgpuContext {
         &mut self,
         image_width: u32,
         image_height: u32,
-        output_width: u32,
+        output_width: u32, // TODO remove?? or keep these for when we rework scaling to be in gpu
         output_height: u32,
     ) {
         let instance = wgpu::Instance::default();
@@ -83,9 +81,11 @@ impl WgpuContext {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb, // TODO might need to be rgba8Unorm according to examples
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
+            format: wgpu::TextureFormat::Rgba8Unorm, // TODO might need to be rgba8Unorm according to examples
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
         });
 
         // For portability reasons, WebGPU draws a distinction between memory that is
@@ -96,7 +96,8 @@ impl WgpuContext {
         // (which we will later) to copy the buffer modified by the GPU into a
         // mappable, CPU-accessible buffer which we'll create here.
 
-        let output_buffer_size = (output_width * output_height) as wgpu::BufferAddress; // TODO this is stupid and has no chance to work, why do i even need this buffer
+        // this one lives on the CPU i think
+        let output_buffer_size = (image_width * image_height * 4) as wgpu::BufferAddress;
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
             size: output_buffer_size,
@@ -104,45 +105,69 @@ impl WgpuContext {
             mapped_at_creation: false,
         });
 
-        let output_storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("storage buffer"),
-            size: output_buffer_size,
-            usage: wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
+        // this one lives on GPU
+        let output_storage_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("storage texture"),
+            size: input_texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm, // TODO might need to be rgba8Unorm according to examples
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::STORAGE_BINDING
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
         });
 
         // This can be though of as the function signature for our CPU-GPU function.
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        // let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        //     label: None,
+        //     entries: &[
+        //         // INPUT TEXTURE
+        //         wgpu::BindGroupLayoutEntry {
+        //             binding: 0,
+        //             visibility: wgpu::ShaderStages::COMPUTE,
+        //             ty: wgpu::BindingType::Texture {
+        //                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
+        //                 view_dimension: wgpu::TextureViewDimension::D2,
+        //                 multisampled: false,
+        //             },
+        //             count: None,
+        //         },
+        //         // OUTPUT TEXTURE
+        //         wgpu::BindGroupLayoutEntry {
+        //             binding: 1,
+        //             visibility: wgpu::ShaderStages::COMPUTE,
+        //             ty: wgpu::BindingType::Texture {
+        //                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
+        //                 view_dimension: wgpu::TextureViewDimension::D2,
+        //                 multisampled: false,
+        //             },
+        //             count: None,
+        //         },
+        //     ],
+        // });
+
+        // let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        //     label: None,
+        //     bind_group_layouts: &[&bind_group_layout],
+        //     push_constant_ranges: &[],
+        // });
+
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
-            entries: &[
-                // INPUT TEXTURE
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true }, //TODO what does this mean???
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                // OUTPUT BUFFER
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
+            layout: None,
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
+            cache: None,
         });
-        // This ties actual resources stored in the GPU to our metaphorical function
-        // through the binding slots we defined above.
+
+        // this is needed for the bind group to not break, and i think this will have a nicer way to do in a next version of wgpu
+        let bind_group_layout = pipeline.get_bind_group_layout(0);
+
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &bind_group_layout,
@@ -155,23 +180,12 @@ impl WgpuContext {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: output_storage_buffer.as_entire_binding(),
+                    resource: wgpu::BindingResource::TextureView(
+                        &output_storage_texture
+                            .create_view(&wgpu::TextureViewDescriptor::default()),
+                    ),
                 },
             ],
-        });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
-        });
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            module: &shader,
-            entry_point: "main",
-            compilation_options: Default::default(),
-            cache: None,
         });
 
         self.ready = true;
@@ -181,7 +195,7 @@ impl WgpuContext {
         self.bind_group = Some(bind_group);
 
         self.input_texture = Some(input_texture);
-        self.output_storage_buffer = Some(output_storage_buffer);
+        self.output_storage_texture = Some(output_storage_texture);
         self.output_staging_buffer = Some(output_staging_buffer);
 
         self.input_texture_width = Some(image_width);
@@ -218,8 +232,8 @@ impl WgpuContext {
             .input_texture
             .as_ref()
             .expect("This should have been set in setup()");
-        let output_storage_buffer = self
-            .output_storage_buffer
+        let output_storage_texture = self
+            .output_storage_texture
             .as_ref()
             .expect("This should have been set in setup()");
         let output_staging_buffer = self
@@ -263,6 +277,9 @@ impl WgpuContext {
         // than it appears.
         // queue.write_buffer(&input_texture, 0, bytemuck::cast_slice(input));
 
+        eprintln!("{}", input_image.len());
+        eprintln!("{}", input_image.width());
+        eprintln!("{}", input_image.height());
         queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: input_texture,
@@ -276,7 +293,12 @@ impl WgpuContext {
                 bytes_per_row: Some(4 * input_texture_width),
                 rows_per_image: Some(*input_texture_height),
             },
-            *input_texture_size,
+            wgpu::Extent3d {
+                width: *input_texture_width,
+                height: *input_texture_height,
+                depth_or_array_layers: 1,
+            },
+            // *input_texture_size,
         );
 
         // A command encoder executes one or many pipelines.
@@ -289,7 +311,7 @@ impl WgpuContext {
                 timestamp_writes: None,
             });
             compute_pass.set_pipeline(&pipeline);
-            compute_pass.set_bind_group(0, &bind_group, &[]);
+            compute_pass.set_bind_group(0, Some(bind_group), &[]);
             compute_pass.insert_debug_marker("compute collatz iterations"); // TODO lol correct marker
 
             // TODO workgroup count https://blog.redwarp.app/image-filters/
@@ -301,12 +323,26 @@ impl WgpuContext {
 
         // Sets adds copy operation to command encoder.
         // Will copy data from storage buffer on GPU to staging buffer on CPU.
-        encoder.copy_buffer_to_buffer(
-            &output_storage_buffer,
-            0,
-            &output_staging_buffer,
-            0,
-            *output_buffer_size,
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTextureBase {
+                texture: &output_storage_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBufferBase {
+                buffer: &output_staging_buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(input_texture_width * 4),
+                    rows_per_image: Some(*input_texture_height),
+                },
+            },
+            wgpu::Extent3d {
+                width: *input_texture_width,
+                height: *input_texture_height,
+                depth_or_array_layers: 1,
+            },
         );
 
         // Submits command encoder for processing
@@ -365,11 +401,17 @@ pub fn try_process_on_gpu(
 
     // TODO maybe move this check into context
     if unsafe { !CONTEXT.ready } {
-        let (image_width, image_height) = image.dimensions();
-        block_on(unsafe { CONTEXT.setup(image_width, image_height, width, height) });
+        // let (image_width, image_height) = image.dimensions();
+        block_on(unsafe { CONTEXT.setup(64, 64, width, height) });
     }
 
-    let compute_result = block_on(unsafe { CONTEXT.process(image.to_rgba8()) });
+    let compute_result = block_on(unsafe {
+        CONTEXT.process(
+            image
+                .resize_exact(64, 64, image::imageops::FilterType::Triangle)
+                .to_rgba8(),
+        )
+    });
     match compute_result {
         Ok(data) => {
             println!("gpu returned {:?}", data);
