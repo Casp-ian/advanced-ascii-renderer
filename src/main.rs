@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 use std::{fmt::Debug, time::Instant};
 
 use clap::{Parser, ValueEnum};
@@ -162,8 +163,12 @@ fn get_fitting_terminal(
 fn main() {
     let args = Args::parse();
 
+    let path = args.path.clone(); // PARTIAL CLONE>???????!?!?!?!??!>!
+
+    let mut thing = Magic::new(args);
+
     // TRY IMAGE =====
-    let reader_result = Reader::open(&args.path);
+    let reader_result = Reader::open(path.clone());
     if reader_result.is_err() {
         eprintln!("Cannot find file");
         return;
@@ -171,7 +176,7 @@ fn main() {
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
-        println!("{}", do_image_stuff(image, &args));
+        println!("{}", thing.do_magic(image));
         return;
     } else {
         eprintln!("Cannot open as an image");
@@ -184,154 +189,94 @@ fn main() {
     eprintln!("Trying to open as a video");
 
     crossterm::execute!(io::stdout(), EnterAlternateScreen);
-    do_video_stuff(&args);
+    do_video_stuff(thing, path);
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
-fn do_video_stuff(args: &Args) {
-    let intermediate_output = "output.jpg";
-
-    let command_result = Command::new("ffprobe")
-        .args(["-i", &args.path.to_str().unwrap()])
-        .args(["-show_entries", "format=duration"])
-        .args(["-v", "quiet"])
-        .args(["-of", "default=noprint_wrappers=1:nokey=1"])
-        .output();
-
-    if let Err(error) = command_result {
-        eprintln!("probably couldnt find ffmprobe (often installed with ffmpeg) on your system");
-        eprintln!("{}", error);
-        return;
-    }
-
-    // TODO allow user to decide this
-    let quality = "5"; //nothig wrong with this being a string, as this will come from the user input later anyways
-    let start_time = Instant::now();
-    let length = String::from_utf8(command_result.unwrap().stdout)
-        .unwrap()
-        .replace("\n", "")
-        .parse::<f32>()
-        .unwrap();
-
-    let command_result = Command::new("ffmpeg")
-        .arg("-y")
-        .args([
-            "-ss",
-            start_time.elapsed().as_secs_f32().to_string().as_str(),
-        ])
-        .args(["-i", &args.path.to_str().unwrap()])
-        .args(["-q:v", quality])
-        .args(["-frames:v", "1"])
-        .arg(intermediate_output)
-        .output();
-
-    if let Err(error) = command_result {
-        eprintln!("probably couldnt find ffmpeg on your system");
-        eprintln!("{}", error);
-        return;
-    }
-    let reader_result = Reader::open(intermediate_output);
-    if reader_result.is_err() {
-        eprintln!("Cannot find file");
-        return;
-    }
-    let image = reader_result.unwrap().decode().unwrap();
-    let (columns, rows) = get_cols_and_rows(
-        args.char_width,
-        args.char_height,
-        args.height,
-        args.width,
-        image.width(),
-        image.height(),
-    );
-    eprintln!("columns: {}, rows: {}", columns, rows);
-    let pixel_info = process_image(image, columns, rows, args);
-
-    let result = translate_to_text(
-        pixel_info,
-        columns,
-        rows,
-        args.set,
-        args.color,
-        args.inverted,
-        args.no_lines,
-    );
-
-    crossterm::execute!(io::stdout(), Clear(terminal::ClearType::All));
+fn do_video_stuff(mut args: Magic, path: PathBuf) {
+    let videoMagic = VideoThing::new(&path).unwrap();
     // print actual image
-    println!("{}", result);
-
     loop {
-        if length < start_time.elapsed().as_secs_f32() {
+        if let Ok(image) = videoMagic.getFrameAsImage(&path) {
+            let result = args.do_magic(image);
+            crossterm::execute!(io::stdout(), Clear(terminal::ClearType::All));
+            println!("{}", result);
+        } else {
             break;
         }
 
+        // print actual image
+
+        // TODO move up the amount of rows calculated, this still does not work, i think because you cant move up more than the terminal height
+    }
+
+    // TODO if the command gets terminated, the intermediate output does not get cleaned up
+}
+
+struct VideoThing {
+    quality: String,
+    start_time: Instant,
+    length: f32,
+    intermediate_output: String,
+}
+impl VideoThing {
+    fn new(path: &PathBuf) -> Result<VideoThing, String> {
+        let command_result = Command::new("ffprobe")
+            .args(["-i", path.to_str().unwrap()])
+            .args(["-show_entries", "format=duration"])
+            .args(["-v", "quiet"])
+            .args(["-of", "default=noprint_wrappers=1:nokey=1"])
+            .output();
+
+        if let Err(error) = command_result {
+            eprintln!(
+                "probably couldnt find ffmprobe (often installed with ffmpeg) on your system"
+            );
+            // eprintln!("{}", error);
+            return Err(error.to_string());
+        }
+
+        // TODO allow user to decide this
+        let quality = "5".to_string(); //nothig wrong with this being a string, as this will come from the user input later anyways
+        let start_time = Instant::now();
+        let length = String::from_utf8(command_result.unwrap().stdout)
+            .unwrap()
+            .replace("\n", "")
+            .parse::<f32>()
+            .unwrap();
+        return Ok(VideoThing {
+            quality,
+            start_time,
+            length,
+            intermediate_output: "shit.png".to_string(),
+        });
+    }
+    fn getFrameAsImage(&self, path: &PathBuf) -> Result<DynamicImage, String> {
+        if self.length < self.start_time.elapsed().as_secs_f32() {
+            return Err("out of video".to_string());
+        }
         let command_result = Command::new("ffmpeg")
             .arg("-y")
             .args([
                 "-ss",
-                start_time.elapsed().as_secs_f32().to_string().as_str(),
+                self.start_time.elapsed().as_secs_f32().to_string().as_str(),
             ])
-            .args(["-i", &args.path.to_str().unwrap()])
-            .args(["-q:v", quality])
+            .args(["-i", path.to_str().unwrap()])
+            .args(["-q:v", &self.quality])
             .args(["-frames:v", "1"])
-            .arg(intermediate_output)
+            .arg(&self.intermediate_output)
             .output();
 
         if command_result.is_ok() {
-            let reader_result = Reader::open(intermediate_output);
+            let reader_result = Reader::open(&self.intermediate_output);
             if reader_result.is_err() {
                 eprintln!("Cannot find file");
-                return;
+                return Err("Cannot find file".to_string());
             }
             let image = reader_result.unwrap().decode().unwrap();
-            let pixel_info = process_image(image, columns, rows, args);
-
-            let result = translate_to_text(
-                pixel_info,
-                columns,
-                rows,
-                args.set,
-                args.color,
-                args.inverted,
-                args.no_lines,
-            );
-
-            // print actual image
-            println!("{}", result);
-
-            // TODO move up the amount of rows calculated, this still does not work, i think because you cant move up more than the terminal height
-            println!("\x1b[{}A", rows);
+            let _ = Command::new("rm").arg(&self.intermediate_output).output();
+            return Ok(image);
         }
+        return Err("fuck you".to_string());
     }
-
-    // TODO if the command gets terminated, the intermediate output does not get cleaned up
-    let _ = Command::new("rm").arg(intermediate_output).output();
-}
-
-fn do_image_stuff(image: DynamicImage, args: &Args) -> String {
-    let (columns, rows) = get_cols_and_rows(
-        args.char_width,
-        args.char_height,
-        args.height,
-        args.width,
-        image.width(),
-        image.height(),
-    );
-    eprintln!("columns: {}, rows: {}", columns, rows);
-
-    let pixel_info = process_image(image, columns, rows, args);
-
-    let result = translate_to_text(
-        pixel_info,
-        columns,
-        rows,
-        args.set,
-        args.color,
-        args.inverted,
-        args.no_lines,
-    );
-
-    // print actual image
-    return result;
 }

@@ -38,6 +38,7 @@ pub fn translate_to_text(
         let pixel_y_min = (image.len() as f32 * y as f32 / columns as f32) as u32;
         let pixel_y_max = (image.len() as f32 * (y + 1) as f32 / columns as f32) as u32;
 
+        // this is effectively the downscaling part, and needs to be looked into
         for x in 0..rows {
             let pixel_x_min =
                 (image.get(0).unwrap().len() as f32 * (x as f32 / rows as f32)) as u32;

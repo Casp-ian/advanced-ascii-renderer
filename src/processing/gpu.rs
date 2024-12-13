@@ -1,53 +1,35 @@
-use image::{DynamicImage, GenericImageView, Rgba};
+use std::io::Cursor;
+
+use image::{DynamicImage, Rgba};
 use pollster::block_on;
 
 use crate::{Args, PixelData};
 
-struct WgpuContext {
+pub struct WgpuContext {
     failed: bool,
-    ready: bool,
-    device: Option<wgpu::Device>,
-    queue: Option<wgpu::Queue>,
-    pipeline: Option<wgpu::ComputePipeline>,
-    bind_group: Option<wgpu::BindGroup>,
-    input_texture: Option<wgpu::Texture>,
-    output_storage_texture: Option<wgpu::Texture>,
-    output_staging_buffer: Option<wgpu::Buffer>,
-    input_texture_width: Option<u32>,
-    input_texture_height: Option<u32>,
-    output_width: Option<u32>,
-    output_height: Option<u32>,
-    input_texture_size: Option<wgpu::Extent3d>,
-    output_buffer_size: Option<wgpu::BufferAddress>,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    pipeline: wgpu::ComputePipeline,
+    bind_group: wgpu::BindGroup,
+    input_texture: wgpu::Texture,
+    output_storage_texture: wgpu::Texture,
+    output_staging_buffer: wgpu::Buffer,
+    input_texture_width: u32,
+    input_texture_height: u32,
+    output_width: u32,
+    output_height: u32,
+    input_texture_size: wgpu::Extent3d,
+    output_buffer_size: wgpu::BufferAddress,
 }
-impl WgpuContext {
-    const fn empty() -> WgpuContext {
-        WgpuContext {
-            failed: false,
-            ready: false,
-            device: None,
-            queue: None,
-            pipeline: None,
-            bind_group: None,
-            input_texture: None,
-            output_storage_texture: None,
-            output_staging_buffer: None,
-            input_texture_width: None,
-            input_texture_height: None,
-            output_width: None,
-            output_height: None,
-            input_texture_size: None,
-            output_buffer_size: None,
-        }
-    }
 
-    async fn setup(
-        &mut self,
+impl WgpuContext {
+    // TODO get rid of unwraps for better error messages
+    pub async fn setup(
         image_width: u32,
         image_height: u32,
         output_width: u32, // TODO remove?? or keep these for when we rework scaling to be in gpu
         output_height: u32,
-    ) {
+    ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
@@ -165,7 +147,7 @@ impl WgpuContext {
             cache: None,
         });
 
-        // this is needed for the bind group to not break, and i think this will have a nicer way to do in a next version of wgpu
+        // NOTE this is needed for the bind group to not break, and i think this will have a nicer way to do in a next version of wgpu
         let bind_group_layout = pipeline.get_bind_group_layout(0);
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -188,101 +170,40 @@ impl WgpuContext {
             ],
         });
 
-        self.ready = true;
-        self.device = Some(device);
-        self.queue = Some(queue);
-        self.pipeline = Some(pipeline);
-        self.bind_group = Some(bind_group);
-
-        self.input_texture = Some(input_texture);
-        self.output_storage_texture = Some(output_storage_texture);
-        self.output_staging_buffer = Some(output_staging_buffer);
-
-        self.input_texture_width = Some(image_width);
-        self.input_texture_height = Some(image_height);
-        self.output_width = Some(output_width);
-        self.output_height = Some(output_height);
-
-        self.input_texture_size = Some(input_texture_size);
-        self.output_buffer_size = Some(output_buffer_size);
+        return Ok(WgpuContext {
+            failed: false,
+            device,
+            queue,
+            pipeline,
+            bind_group,
+            input_texture,
+            output_storage_texture,
+            output_staging_buffer,
+            input_texture_width: image_width,
+            input_texture_height: image_height,
+            output_width,
+            output_height,
+            input_texture_size,
+            output_buffer_size,
+        });
     }
 
-    async fn process(
-        &mut self,
+    pub async fn process(
+        &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
-    ) -> Result<Vec<u32>, &str> {
-        let device = self
-            .device
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let queue = self
-            .queue
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let pipeline = self
-            .pipeline
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let bind_group = self
-            .bind_group
-            .as_ref()
-            .expect("This should have been set in setup()");
-
-        let input_texture = self
-            .input_texture
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let output_storage_texture = self
-            .output_storage_texture
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let output_staging_buffer = self
-            .output_staging_buffer
-            .as_ref()
-            .expect("This should have been set in setup()");
-
-        let input_texture_width = self
-            .input_texture_width
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let input_texture_height = self
-            .input_texture_height
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let output_width = self
-            .output_width
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let output_height = self
-            .output_height
-            .as_ref()
-            .expect("This should have been set in setup()");
-
-        let input_texture_size = self
-            .input_texture_size
-            .as_ref()
-            .expect("This should have been set in setup()");
-        let output_buffer_size = self
-            .output_buffer_size
-            .as_ref()
-            .expect("This should have been set in setup()");
-
+    ) -> Result<Vec<u8>, &str> {
+        // TODO
         // if &size_of_val(input_image) != size {
-        //     self.failed = true;
         //     return Err("input size changed");
         // }
 
         // Local buffer contents -> GPU storage buffer
         // Adds a write buffer command to the queue. This command is more complicated
         // than it appears.
-        // queue.write_buffer(&input_texture, 0, bytemuck::cast_slice(input));
 
-        eprintln!("{}", input_image.len());
-        eprintln!("{}", input_image.width());
-        eprintln!("{}", input_image.height());
-        queue.write_texture(
+        self.queue.write_texture(
             wgpu::ImageCopyTexture {
-                texture: input_texture,
+                texture: &self.input_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
@@ -290,34 +211,34 @@ impl WgpuContext {
             bytemuck::cast_slice(input_image.as_raw()),
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * input_texture_width),
-                rows_per_image: Some(*input_texture_height),
+                bytes_per_row: Some(self.input_texture_width * 4),
+                rows_per_image: Some(self.input_texture_height),
             },
-            wgpu::Extent3d {
-                width: *input_texture_width,
-                height: *input_texture_height,
-                depth_or_array_layers: 1,
-            },
-            // *input_texture_size,
+            self.input_texture_size,
         );
 
         // A command encoder executes one or many pipelines.
         // It is to WebGPU what a command buffer is to Vulkan.
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: None,
                 timestamp_writes: None,
             });
-            compute_pass.set_pipeline(&pipeline);
-            compute_pass.set_bind_group(0, Some(bind_group), &[]);
-            compute_pass.insert_debug_marker("compute collatz iterations"); // TODO lol correct marker
+            compute_pass.set_pipeline(&self.pipeline);
+            compute_pass.set_bind_group(0, Some(&self.bind_group), &[]);
+            compute_pass.insert_debug_marker("compute shader");
 
             // TODO workgroup count https://blog.redwarp.app/image-filters/
             // Number of cells to run, the (x,y,z) size of item being processed
             // TODO this should be output, not input... i think
-            compute_pass.dispatch_workgroups(*input_texture_width, *input_texture_height, 1);
+            compute_pass.dispatch_workgroups(
+                self.input_texture_width,
+                self.input_texture_height,
+                1,
+            );
             // TODO fucked according to tutorial
         }
 
@@ -325,31 +246,27 @@ impl WgpuContext {
         // Will copy data from storage buffer on GPU to staging buffer on CPU.
         encoder.copy_texture_to_buffer(
             wgpu::ImageCopyTextureBase {
-                texture: &output_storage_texture,
+                texture: &self.output_storage_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             wgpu::ImageCopyBufferBase {
-                buffer: &output_staging_buffer,
+                buffer: &self.output_staging_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(input_texture_width * 4),
-                    rows_per_image: Some(*input_texture_height),
+                    bytes_per_row: Some(self.input_texture_width * 4),
+                    rows_per_image: Some(self.input_texture_height),
                 },
             },
-            wgpu::Extent3d {
-                width: *input_texture_width,
-                height: *input_texture_height,
-                depth_or_array_layers: 1,
-            },
+            self.input_texture_size,
         );
 
         // Submits command encoder for processing
-        queue.submit(Some(encoder.finish()));
+        self.queue.submit(Some(encoder.finish()));
 
         // Note that we're not calling `.await` here.
-        let buffer_slice = output_staging_buffer.slice(..);
+        let buffer_slice = self.output_staging_buffer.slice(..);
         // Sets the buffer up for mapping, sending over the result of the mapping back to us when it is finished.
         let (sender, receiver) = flume::bounded(1);
         buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
@@ -357,8 +274,7 @@ impl WgpuContext {
         // Poll the device in a blocking manner so that our future resolves.
         // In an actual application, `device.poll(...)` should
         // be called in an event loop or on another thread.
-        // TODO the comment above is from the example, i do want this to be an actual application
-        device.poll(wgpu::Maintain::wait()).panic_on_timeout();
+        self.device.poll(wgpu::Maintain::wait()).panic_on_timeout();
 
         // Awaits until `buffer_future` can be read from
         if let Ok(Ok(())) = receiver.recv_async().await {
@@ -370,55 +286,16 @@ impl WgpuContext {
             // With the current interface, we have to make sure all mapped views are
             // dropped before we unmap the buffer.
             drop(data);
-            output_staging_buffer.unmap(); // Unmaps buffer from memory
-                                           // If you are familiar with C++ these 2 lines can be thought of similarly to:
-                                           //   delete myPointer;
-                                           //   myPointer = NULL;
-                                           // It effectively frees the memory
+            self.output_staging_buffer.unmap(); // Unmaps buffer from memory
+                                                // If you are familiar with C++ these 2 lines can be thought of similarly to:
+                                                //   delete myPointer;
+                                                //   myPointer = NULL;
+                                                // It effectively frees the memory
 
             // Returns data from buffer
             return Ok(result);
         } else {
-            self.failed = true;
-            return Err("cant run on gpu");
+            return Err("cant run on gpu"); // TODO stupid message
         }
-    }
-}
-
-// maybe std::cell can save us from unsafe
-static mut CONTEXT: WgpuContext = WgpuContext::empty();
-
-pub fn try_process_on_gpu(
-    image: DynamicImage,
-    width: u32,
-    height: u32,
-    args: &Args,
-) -> Result<Vec<Vec<PixelData>>, &str> {
-    // TODO do i have to be unsafe? i think its fine tho
-    if unsafe { CONTEXT.failed } {
-        return Err("failed before, not retrying");
-    }
-
-    // TODO maybe move this check into context
-    if unsafe { !CONTEXT.ready } {
-        // let (image_width, image_height) = image.dimensions();
-        block_on(unsafe { CONTEXT.setup(64, 64, width, height) });
-    }
-
-    let compute_result = block_on(unsafe {
-        CONTEXT.process(
-            image
-                .resize_exact(64, 64, image::imageops::FilterType::Triangle)
-                .to_rgba8(),
-        )
-    });
-    match compute_result {
-        Ok(data) => {
-            println!("gpu returned {:?}", data);
-            println!("{} to {}", data.len(), width);
-            // TODO actually return
-            return Ok(vec![]);
-        }
-        Err(message) => return Err(message),
     }
 }
