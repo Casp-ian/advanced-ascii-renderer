@@ -9,6 +9,7 @@ edition = "2021"
 bytemuck = "1.18.0"
 clap = { version = "4.4.18", features = ["derive"] }
 crossterm = "0.28.1"
+ctrlc = "3.4.5"
 flume = "0.11.0"
 image = "0.24.8"
 pollster = "0.4.0"

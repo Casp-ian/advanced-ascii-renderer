@@ -57,7 +57,7 @@ impl Magic {
         let gpu = self.gpu.as_ref().unwrap();
 
         let color_buffer = image
-            .resize_exact(64, 40, image::imageops::FilterType::Triangle)
+            .resize_to_fill(64, 40, image::imageops::FilterType::Nearest)
             .to_rgba8();
         let buffer = gpu.process(color_buffer.clone()).block_on().unwrap();
 

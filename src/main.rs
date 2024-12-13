@@ -36,6 +36,10 @@ struct Args {
     #[arg(long, default_value_t, value_enum)]
     set: CharSet,
 
+    /// Only affects videos, 1 is high bitrate 10 is low bitrate
+    #[arg(short, long, default_value_t = 5)]
+    quality: u8,
+
     /// make dark areas light, and light areas dark
     #[arg(long)]
     inverted: bool,
@@ -160,10 +164,20 @@ fn get_fitting_terminal(
     return (max_terminal_chars_y, x_chars);
 }
 
+fn do_before_exit() {
+    // TODO the filename is still arbitrary right now
+    let _ = Command::new("rm").arg("shit.png").output();
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen);
+}
+
 fn main() {
+    // functionality can still go ahead, even if we cant clean up after the user presses ctrl c
+    let _ = ctrlc::set_handler(do_before_exit);
+
     let args = Args::parse();
 
     let path = args.path.clone(); // PARTIAL CLONE>???????!?!?!?!??!>!
+    let quality = args.quality.clone();
 
     let mut thing = Magic::new(args);
 
@@ -189,30 +203,25 @@ fn main() {
     eprintln!("Trying to open as a video");
 
     crossterm::execute!(io::stdout(), EnterAlternateScreen);
-    do_video_stuff(thing, path);
+    do_video_stuff(thing, path, quality);
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
-fn do_video_stuff(mut args: Magic, path: PathBuf) {
-    let videoMagic = VideoThing::new(&path).unwrap();
-    // print actual image
+fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, quality: u8) {
+    let video_magic = VideoThing::new(&path, quality).unwrap();
     loop {
-        if let Ok(image) = videoMagic.getFrameAsImage(&path) {
-            let result = args.do_magic(image);
+        if let Ok(image) = video_magic.get_frame_as_image(&path) {
+            let result = image_magic_thing.do_magic(image);
             crossterm::execute!(io::stdout(), Clear(terminal::ClearType::All));
             println!("{}", result);
         } else {
             break;
         }
-
-        // print actual image
-
-        // TODO move up the amount of rows calculated, this still does not work, i think because you cant move up more than the terminal height
     }
-
-    // TODO if the command gets terminated, the intermediate output does not get cleaned up
 }
 
+// NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
+// so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now
 struct VideoThing {
     quality: String,
     start_time: Instant,
@@ -220,7 +229,7 @@ struct VideoThing {
     intermediate_output: String,
 }
 impl VideoThing {
-    fn new(path: &PathBuf) -> Result<VideoThing, String> {
+    fn new(path: &PathBuf, quality: u8) -> Result<VideoThing, String> {
         let command_result = Command::new("ffprobe")
             .args(["-i", path.to_str().unwrap()])
             .args(["-show_entries", "format=duration"])
@@ -237,7 +246,7 @@ impl VideoThing {
         }
 
         // TODO allow user to decide this
-        let quality = "5".to_string(); //nothig wrong with this being a string, as this will come from the user input later anyways
+        // let quality = "5".to_string(); //nothig wrong with this being a string, as this will come from the user input later anyways
         let start_time = Instant::now();
         let length = String::from_utf8(command_result.unwrap().stdout)
             .unwrap()
@@ -245,13 +254,14 @@ impl VideoThing {
             .parse::<f32>()
             .unwrap();
         return Ok(VideoThing {
-            quality,
+            quality: quality.to_string(),
             start_time,
             length,
             intermediate_output: "shit.png".to_string(),
         });
     }
-    fn getFrameAsImage(&self, path: &PathBuf) -> Result<DynamicImage, String> {
+
+    fn get_frame_as_image(&self, path: &PathBuf) -> Result<DynamicImage, String> {
         if self.length < self.start_time.elapsed().as_secs_f32() {
             return Err("out of video".to_string());
         }
