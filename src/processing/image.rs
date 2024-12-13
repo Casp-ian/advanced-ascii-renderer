@@ -27,7 +27,6 @@ pub enum Direction {
 
 pub struct Magic {
     args: Args,
-    // abandon_gpu: bool,
     gpu: Option<WgpuContext>,
 }
 impl Magic {

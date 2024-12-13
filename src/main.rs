@@ -36,9 +36,13 @@ struct Args {
     #[arg(long, default_value_t, value_enum)]
     set: CharSet,
 
-    /// Only affects videos, 1 is high bitrate 10 is low bitrate
+    /// Only affects videos, lower value is high quality, higher value is
     #[arg(short, long, default_value_t = 5)]
     quality: u8,
+
+    /// Only affects videos, sets audio volume, clamps to 100
+    #[arg(short, long, default_value_t = 0)]
+    volume: u8,
 
     /// make dark areas light, and light areas dark
     #[arg(long)]
@@ -178,6 +182,7 @@ fn main() {
 
     let path = args.path.clone(); // PARTIAL CLONE>???????!?!?!?!??!>!
     let quality = args.quality.clone();
+    let volume = args.volume.clone();
 
     let mut thing = Magic::new(args);
 
@@ -203,12 +208,12 @@ fn main() {
     eprintln!("Trying to open as a video");
 
     crossterm::execute!(io::stdout(), EnterAlternateScreen);
-    do_video_stuff(thing, path, quality);
+    do_video_stuff(thing, path, quality, volume);
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
-fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, quality: u8) {
-    let video_magic = VideoThing::new(&path, quality).unwrap();
+fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, quality: u8, volume: u8) {
+    let video_magic = VideoThing::new(&path, quality, volume).unwrap();
     loop {
         if let Ok(image) = video_magic.get_frame_as_image(&path) {
             let result = image_magic_thing.do_magic(image);
@@ -229,7 +234,7 @@ struct VideoThing {
     intermediate_output: String,
 }
 impl VideoThing {
-    fn new(path: &PathBuf, quality: u8) -> Result<VideoThing, String> {
+    fn new(path: &PathBuf, quality: u8, volume: u8) -> Result<VideoThing, String> {
         let command_result = Command::new("ffprobe")
             .args(["-i", path.to_str().unwrap()])
             .args(["-show_entries", "format=duration"])
@@ -243,6 +248,16 @@ impl VideoThing {
             );
             // eprintln!("{}", error);
             return Err(error.to_string());
+        }
+
+        if volume > 0 {
+            Command::new("ffplay")
+                .args([path.to_str().unwrap()])
+                .args(["-nodisp"])
+                .args(["-v", "quiet"])
+                .args(["-volume", &volume.to_string()])
+                .spawn()
+                .expect("audio broke");
         }
 
         // TODO allow user to decide this
