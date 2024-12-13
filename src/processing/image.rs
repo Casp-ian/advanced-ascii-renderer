@@ -95,9 +95,10 @@ impl Magic {
     }
 }
 
-fn get_direction(gx: u8, gy: u8) -> Direction {
-    let gx = (gx as f32 / 256.0);
-    let gy = (gy as f32 / 256.0);
+fn get_direction(gx: i8, gy: i8) -> Direction {
+    let gx = gx as f32 / 128.0;
+    let gy = gy as f32 / 128.0;
+
     let magnitude_threshold = 0.8;
     let magnitude = (gx.powi(2) + gy.powi(2)).sqrt();
     let dir = gy.atan2(gx);

@@ -94,13 +94,12 @@ impl WgpuContext {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm, // TODO might need to be rgba8Unorm according to examples
+            format: wgpu::TextureFormat::Rgba8Snorm, // TODO might need to be rgba8Unorm according to examples
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+                | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[wgpu::TextureFormat::Rgba8Snorm],
         });
 
         // This can be though of as the function signature for our CPU-GPU function.
@@ -191,7 +190,7 @@ impl WgpuContext {
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
-    ) -> Result<Vec<u8>, &str> {
+    ) -> Result<Vec<i8>, &str> {
         // TODO
         // if &size_of_val(input_image) != size {
         //     return Err("input size changed");
