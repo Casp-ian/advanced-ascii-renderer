@@ -1,18 +1,25 @@
 @group(0)
 @binding(0)
-var inputTexture: texture_2d<f32>;
-
-// @group(0)
-// @binding(1)
-// var outputTexture: texture_storage_2d<rgba8snorm, write>; // this is used as both input and output for convenience
+var<uniform> resolutions: vec4<u32>;
 
 @group(0)
 @binding(1)
-var<storage, read_write> outputTexture: array<vec4<f32>>; // this is used as.0 bo.0th input and output for convenience
+var inputTexture: texture_2d<f32>;
 
 @group(0)
 @binding(2)
-var<uniform> resolutions: vec4<u32>;
+var<storage, read_write> intermediateBuffer: array<Test>;
+
+@group(0)
+@binding(3)
+var<storage, read_write> outputBuffer: array<Test>;
+
+struct Test {
+    gx: f32,
+    gy: f32,
+    d1: f32,
+    d2: f32,
+}
 
 
 fn coords(x: u32, y: u32) -> u32 {
@@ -25,7 +32,7 @@ fn average(vec: vec3<f32>) -> f32 {
 
 @compute
 @workgroup_size(1)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     if (global_id.x == 0) || (global_id.y == 0) {
         return;
     }
@@ -52,6 +59,12 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     // TODO, how do i improve the soble edge detection, could use DoG, or some other approach making use of our weird scaling situation
 
-    // textureStore(outputTexture, global_id.xy, vec4<f32>(gx, gy, 0.0, 0.0));
-    outputTexture[coords(global_id.x, global_id.y)] = vec4<f32>(gx, gy, 0.0, 0.0);
+    // textureStore(outputBuffer, global_id.xy, vec4<f32>(gx, gy, 0.0, 0.0));
+    intermediateBuffer[coords(global_id.x, global_id.y)] = Test(gx, gy, 0.0, 0.0);
+}
+
+@compute
+@workgroup_size(1)
+fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    outputBuffer[coords(global_id.x, global_id.y)] = intermediateBuffer[coords(global_id.x, global_id.y)];
 }

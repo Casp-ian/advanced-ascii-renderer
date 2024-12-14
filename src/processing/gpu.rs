@@ -4,9 +4,12 @@ use wgpu::util::{BufferInitDescriptor, DeviceExt};
 pub struct WgpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
-    pipeline: wgpu::ComputePipeline,
-    bind_group: wgpu::BindGroup,
+    pipeline_edges: wgpu::ComputePipeline,
+    bind_group_edges: wgpu::BindGroup,
+    pipeline_scale: wgpu::ComputePipeline,
+    bind_group_scale: wgpu::BindGroup,
     input_texture: wgpu::Texture,
+    intermediate_storage_buffer: wgpu::Buffer,
     output_storage_buffer: wgpu::Buffer,
     output_staging_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
@@ -15,6 +18,7 @@ pub struct WgpuContext {
     output_width: u32,
     output_height: u32,
     input_texture_size: wgpu::Extent3d,
+    intermediate_buffer_size: wgpu::BufferAddress,
     output_buffer_size: wgpu::BufferAddress,
 }
 
@@ -74,6 +78,17 @@ impl WgpuContext {
         // (which we will later) to copy the buffer modified by the GPU into a
         // mappable, CPU-accessible buffer which we'll create here.
 
+        let intermediate_buffer_size = (image_width * image_height * 16) as wgpu::BufferAddress;
+        // this one lives on GPU
+        let intermediate_storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("staging buffer"),
+            size: intermediate_buffer_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         // this one lives on the CPU i think
         let output_buffer_size = (image_width * image_height * 16) as wgpu::BufferAddress;
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -104,67 +119,63 @@ impl WgpuContext {
             ]),
         });
 
-        // This can be though of as the function signature for our CPU-GPU function.
-        // let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        //     label: None,
-        //     entries: &[
-        //         // INPUT TEXTURE
-        //         wgpu::BindGroupLayoutEntry {
-        //             binding: 0,
-        //             visibility: wgpu::ShaderStages::COMPUTE,
-        //             ty: wgpu::BindingType::Texture {
-        //                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
-        //                 view_dimension: wgpu::TextureViewDimension::D2,
-        //                 multisampled: false,
-        //             },
-        //             count: None,
-        //         },
-        //         // OUTPUT TEXTURE
-        //         wgpu::BindGroupLayoutEntry {
-        //             binding: 1,
-        //             visibility: wgpu::ShaderStages::COMPUTE,
-        //             ty: wgpu::BindingType::Texture {
-        //                 sample_type: wgpu::TextureSampleType::Float { filterable: false },
-        //                 view_dimension: wgpu::TextureViewDimension::D2,
-        //                 multisampled: false,
-        //             },
-        //             count: None,
-        //         },
-        //     ],
-        // });
-
-        // let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        //     label: None,
-        //     bind_group_layouts: &[&bind_group_layout],
-        //     push_constant_ranges: &[],
-        // });
-
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        let pipeline_edges = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
             layout: None,
             module: &shader,
-            entry_point: Some("main"),
+            entry_point: Some("do_edges"),
             compilation_options: Default::default(),
             cache: None,
         });
 
-        // NOTE this is needed for the bind group to not break, and i hope this will have a nicer way to do in a next version of wgpu
-        let bind_group_layout = pipeline.get_bind_group_layout(0);
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group_edges = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
-            layout: &bind_group_layout,
+            // this layout using an empty layout from the pipeline looks weird but works
+            // from documentation: "If this pipeline was created with a default layout, then bind groups created with the returned BindGroupLayout can only be used with this pipeline."
+            layout: &pipeline_edges.get_bind_group_layout(0),
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &uniform_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
                     resource: wgpu::BindingResource::TextureView(
                         &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
                     ),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 1,
+                    binding: 2,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &output_storage_buffer,
+                        buffer: &intermediate_storage_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+            ],
+        });
+
+        let pipeline_scale = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: None,
+            layout: None,
+            module: &shader,
+            entry_point: Some("do_scale"),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+
+        let bind_group_scale = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout: &pipeline_scale.get_bind_group_layout(0),
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &uniform_buffer,
                         offset: 0,
                         size: None,
                     }),
@@ -172,7 +183,15 @@ impl WgpuContext {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &uniform_buffer,
+                        buffer: &intermediate_storage_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &output_storage_buffer,
                         offset: 0,
                         size: None,
                     }),
@@ -183,9 +202,12 @@ impl WgpuContext {
         return Ok(WgpuContext {
             device,
             queue,
-            pipeline,
-            bind_group,
+            pipeline_edges,
+            bind_group_edges,
+            pipeline_scale,
+            bind_group_scale,
             input_texture,
+            intermediate_storage_buffer,
             output_storage_buffer,
             output_staging_buffer,
             uniform_buffer,
@@ -194,6 +216,7 @@ impl WgpuContext {
             output_width,
             output_height,
             input_texture_size,
+            intermediate_buffer_size,
             output_buffer_size,
         });
     }
@@ -202,24 +225,10 @@ impl WgpuContext {
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<Vec<f32>, &str> {
-        // TODO
+        // TODO validate if sizes are sensible?
         // if &size_of_val(input_image) != size {
         //     return Err("input size changed");
         // }
-
-        // Local buffer contents -> GPU storage buffer
-        // Adds a write buffer command to the queue. This command is more complicated
-        // than it appears.
-        self.queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice::<u32, u8>(&[
-                self.input_width,
-                self.input_height,
-                self.output_width,
-                self.output_height,
-            ]),
-        );
 
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
@@ -242,14 +251,27 @@ impl WgpuContext {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
         {
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: None,
                 timestamp_writes: None,
             });
-            compute_pass.set_pipeline(&self.pipeline);
-            compute_pass.set_bind_group(0, Some(&self.bind_group), &[]);
-            compute_pass.insert_debug_marker("compute shader");
+            compute_pass.set_pipeline(&self.pipeline_edges);
+            compute_pass.set_bind_group(0, Some(&self.bind_group_edges), &[]);
+            compute_pass.insert_debug_marker("edges");
+
+            compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
+        }
+
+        {
+            let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: None,
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.pipeline_scale);
+            compute_pass.set_bind_group(0, Some(&self.bind_group_scale), &[]);
+            compute_pass.insert_debug_marker("scale");
 
             compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
         }
