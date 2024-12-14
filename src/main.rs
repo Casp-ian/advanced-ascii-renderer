@@ -11,10 +11,10 @@ mod processing;
 use processing::image::*;
 use processing::text::*;
 
-use std::process::Command;
+use std::process::{Command, Output};
 
 /// Take an image and turn it into text
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)] // TODO unimplement clone and finally just fucking learn how to specify lifetimes
 #[command(author, version, about)]
 struct Args {
     /// Path of image
@@ -43,6 +43,10 @@ struct Args {
     /// Only affects videos, sets audio volume, clamps to 100
     #[arg(short, long, default_value_t = 0)]
     volume: u8,
+
+    /// Only affects videos, use this for taking your webcam or another stream as input
+    #[arg(short, long)]
+    stream: bool,
 
     /// make dark areas light, and light areas dark
     #[arg(long)]
@@ -181,10 +185,8 @@ fn main() {
     let args = Args::parse();
 
     let path = args.path.clone(); // PARTIAL CLONE>???????!?!?!?!??!>!
-    let quality = args.quality.clone();
-    let volume = args.volume.clone();
 
-    let mut thing = Magic::new(args);
+    let mut thing = Magic::new(args.clone());
 
     // TRY IMAGE =====
     let reader_result = Reader::open(path.clone());
@@ -208,12 +210,12 @@ fn main() {
     eprintln!("Trying to open as a video");
 
     crossterm::execute!(io::stdout(), EnterAlternateScreen);
-    do_video_stuff(thing, path, quality, volume);
+    do_video_stuff(thing, path, args);
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
-fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, quality: u8, volume: u8) {
-    let video_magic = VideoThing::new(&path, quality, volume).unwrap();
+fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, args: Args) {
+    let video_magic = VideoThing::new(&path, args).unwrap();
     loop {
         if let Ok(image) = video_magic.get_frame_as_image(&path) {
             let result = image_magic_thing.do_magic(image);
@@ -228,48 +230,54 @@ fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, quality: u8, volu
 // NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
 // so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now
 struct VideoThing {
-    quality: String,
+    args: Args,
     start_time: Instant,
     length: f32,
     intermediate_output: String,
 }
 impl VideoThing {
-    fn new(path: &PathBuf, quality: u8, volume: u8) -> Result<VideoThing, String> {
-        let command_result = Command::new("ffprobe")
-            .args(["-i", path.to_str().unwrap()])
-            .args(["-show_entries", "format=duration"])
-            .args(["-v", "quiet"])
-            .args(["-of", "default=noprint_wrappers=1:nokey=1"])
-            .output();
+    fn new(path: &PathBuf, args: Args) -> Result<VideoThing, String> {
+        // TODO disable when targeting webcam
+        let length: f32;
+        if !args.stream {
+            let command_result = Command::new("ffprobe")
+                .args(["-i", path.to_str().unwrap()])
+                .args(["-show_entries", "format=duration"])
+                .args(["-v", "quiet"])
+                .args(["-of", "default=noprint_wrappers=1:nokey=1"])
+                .output();
 
-        if let Err(error) = command_result {
-            eprintln!(
-                "probably couldnt find ffmprobe (often installed with ffmpeg) on your system"
-            );
-            // eprintln!("{}", error);
-            return Err(error.to_string());
+            if let Err(error) = command_result {
+                eprintln!(
+                    "probably couldnt find ffmprobe (often installed with ffmpeg) on your system"
+                );
+                // eprintln!("{}", error);
+                return Err(error.to_string());
+            }
+
+            length = String::from_utf8(command_result.unwrap().stdout)
+                .unwrap()
+                .replace("\n", "")
+                .parse::<f32>()
+                .unwrap();
+        } else {
+            length = f32::MAX; // still need to set length, but this wont be checked
         }
 
-        if volume > 0 {
+        if args.volume > 0 {
             Command::new("ffplay")
                 .args([path.to_str().unwrap()])
                 .args(["-nodisp"])
                 .args(["-v", "quiet"])
-                .args(["-volume", &volume.to_string()])
+                .args(["-volume", &args.volume.to_string()])
                 .spawn()
                 .expect("audio broke");
         }
 
-        // TODO allow user to decide this
-        // let quality = "5".to_string(); //nothig wrong with this being a string, as this will come from the user input later anyways
         let start_time = Instant::now();
-        let length = String::from_utf8(command_result.unwrap().stdout)
-            .unwrap()
-            .replace("\n", "")
-            .parse::<f32>()
-            .unwrap();
+
         return Ok(VideoThing {
-            quality: quality.to_string(),
+            args,
             start_time,
             length,
             intermediate_output: "shit.png".to_string(),
@@ -280,17 +288,28 @@ impl VideoThing {
         if self.length < self.start_time.elapsed().as_secs_f32() {
             return Err("out of video".to_string());
         }
-        let command_result = Command::new("ffmpeg")
-            .arg("-y")
-            .args([
-                "-ss",
-                self.start_time.elapsed().as_secs_f32().to_string().as_str(),
-            ])
-            .args(["-i", path.to_str().unwrap()])
-            .args(["-q:v", &self.quality])
-            .args(["-frames:v", "1"])
-            .arg(&self.intermediate_output)
-            .output();
+        let command_result: io::Result<Output>;
+        if self.args.stream {
+            command_result = Command::new("ffmpeg")
+                .arg("-y")
+                .args(["-i", path.to_str().unwrap()])
+                .args(["-q:v", &self.args.quality.to_string()])
+                .args(["-frames:v", "1"])
+                .arg(&self.intermediate_output)
+                .output();
+        } else {
+            command_result = Command::new("ffmpeg")
+                .arg("-y")
+                .args([
+                    "-ss",
+                    self.start_time.elapsed().as_secs_f32().to_string().as_str(),
+                ])
+                .args(["-i", path.to_str().unwrap()])
+                .args(["-q:v", &self.args.quality.to_string()])
+                .args(["-frames:v", "1"])
+                .arg(&self.intermediate_output)
+                .output();
+        }
 
         if command_result.is_ok() {
             let reader_result = Reader::open(&self.intermediate_output);
