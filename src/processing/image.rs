@@ -75,15 +75,15 @@ impl Magic {
         let buffer = gpu.process(image.to_rgba8()).block_on().unwrap();
 
         let data: Vec<PixelData> = buffer
-            .chunks_exact(6)
+            .chunks_exact(4)
             .map(|x| PixelData {
                 direction: get_direction(x[0], x[1]),
                 color: Rgb([
-                    (x[2] * 255.0) as u8,
-                    (x[3] * 255.0) as u8,
-                    (x[4] * 255.0) as u8,
+                    bytemuck::cast_slice::<f32, u8>(&[x[2]])[0],
+                    bytemuck::cast_slice::<f32, u8>(&[x[2]])[1],
+                    bytemuck::cast_slice::<f32, u8>(&[x[2]])[2],
                 ]),
-                brightness: x[5],
+                brightness: x[3],
             })
             .collect();
 

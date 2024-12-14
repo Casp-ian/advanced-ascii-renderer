@@ -29,9 +29,7 @@ struct Rotation {
 struct PixelData { // TODO rename here and in image.rs
     gx: f32,
     gy: f32,
-    r: f32,
-    g: f32,
-    b: f32,
+    color: u32,
     brightness: f32,
 }
 
@@ -96,9 +94,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     outputBuffer[coordsOutput(global_id.x, global_id.y)] = PixelData(
         intermediatePixel.gx,
         intermediatePixel.gy,
-        colorPixel.r,
-        colorPixel.g,
-        colorPixel.b,
+        packedColorPixel,
         brightness
     );
 }

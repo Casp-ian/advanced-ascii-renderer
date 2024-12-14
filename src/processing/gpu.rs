@@ -99,8 +99,8 @@ impl WgpuContext {
             mapped_at_creation: false,
         });
 
-        // 6 f32 for every pixel, 4 bytes for every f32, 7 * 4 = 24
-        let output_buffer_size = (output_width * output_height * 24) as wgpu::BufferAddress;
+        // 4 f32 for every pixel, 4 bytes for every f32, 4 * 4 = 16
+        let output_buffer_size = (output_width * output_height * 16) as wgpu::BufferAddress;
         // this one lives on the CPU i think
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
