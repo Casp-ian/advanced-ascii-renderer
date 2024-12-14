@@ -268,6 +268,7 @@ impl VideoThing {
             Command::new("ffplay")
                 .args([path.to_str().unwrap()])
                 .args(["-nodisp"])
+                .args(["-autoexit"])
                 .args(["-v", "quiet"])
                 .args(["-volume", &args.volume.to_string()])
                 .spawn()
