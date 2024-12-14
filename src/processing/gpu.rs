@@ -8,7 +8,7 @@ pub struct WgpuContext {
     bind_group_edges: wgpu::BindGroup,
     pipeline_scale: wgpu::ComputePipeline,
     bind_group_scale: wgpu::BindGroup,
-    input_texture: wgpu::Texture,
+    input_buffer: wgpu::Buffer,
     intermediate_storage_buffer: wgpu::Buffer,
     output_storage_buffer: wgpu::Buffer,
     output_staging_buffer: wgpu::Buffer,
@@ -17,7 +17,7 @@ pub struct WgpuContext {
     input_height: u32,
     output_width: u32,
     output_height: u32,
-    input_texture_size: wgpu::Extent3d,
+    input_buffer_size: wgpu::BufferAddress,
     intermediate_buffer_size: wgpu::BufferAddress,
     output_buffer_size: wgpu::BufferAddress,
 }
@@ -51,24 +51,33 @@ impl WgpuContext {
         // Our shader, kindly compiled with Naga.
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-        let input_texture_size = wgpu::Extent3d {
-            width: input_width,
-            height: input_height,
-            depth_or_array_layers: 1,
-        };
+        // let input_texture_size = wgpu::Extent3d {
+        //     width: input_width,
+        //     height: input_height,
+        //     depth_or_array_layers: 1,
+        // };
 
-        let input_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("input texture"),
-            size: input_texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::COPY_DST
-                | wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        // 4 u8 for every pixel 4 * 1
+        let input_buffer_size = (input_width * input_height * 4) as wgpu::BufferAddress;
+        let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("staging buffer"),
+            size: input_buffer_size,
+            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
+
+        // let input_texture = device.create_texture(&wgpu::TextureDescriptor {
+        //     label: Some("input texture"),
+        //     size: input_texture_size,
+        //     mip_level_count: 1,
+        //     sample_count: 1,
+        //     dimension: wgpu::TextureDimension::D2,
+        //     format: wgpu::TextureFormat::Rgba8Unorm,
+        //     usage: wgpu::TextureUsages::TEXTURE_BINDING
+        //         | wgpu::TextureUsages::COPY_DST
+        //         | wgpu::TextureUsages::RENDER_ATTACHMENT,
+        //     view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        // });
 
         // For portability reasons, WebGPU draws a distinction between memory that is
         // accessible by the CPU and memory that is accessible by the GPU. Only
@@ -78,7 +87,7 @@ impl WgpuContext {
         // (which we will later) to copy the buffer modified by the GPU into a
         // mappable, CPU-accessible buffer which we'll create here.
 
-        // 2 f32 for every pixel
+        // 2 f32 for every pixel 2 * 4 = 8
         let intermediate_buffer_size = (input_width * input_height * 8) as wgpu::BufferAddress;
         // this one lives on GPU
         let intermediate_storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -90,7 +99,7 @@ impl WgpuContext {
             mapped_at_creation: false,
         });
 
-        // 6 f32 for every pixel, 4 bytes for every f32, 6 * 4 = 24
+        // 6 f32 for every pixel, 4 bytes for every f32, 7 * 4 = 24
         let output_buffer_size = (output_width * output_height * 24) as wgpu::BufferAddress;
         // this one lives on the CPU i think
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -146,9 +155,14 @@ impl WgpuContext {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(
-                        &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
-                    ),
+                    // resource: wgpu::BindingResource::TextureView(
+                    //     &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                    // ),
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &input_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -184,9 +198,14 @@ impl WgpuContext {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(
-                        &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
-                    ),
+                    // resource: wgpu::BindingResource::TextureView(
+                    //     &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                    // ),
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &input_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -214,7 +233,7 @@ impl WgpuContext {
             bind_group_edges,
             pipeline_scale,
             bind_group_scale,
-            input_texture,
+            input_buffer,
             intermediate_storage_buffer,
             output_storage_buffer,
             output_staging_buffer,
@@ -223,7 +242,7 @@ impl WgpuContext {
             input_height,
             output_width,
             output_height,
-            input_texture_size,
+            input_buffer_size,
             intermediate_buffer_size,
             output_buffer_size,
         });
@@ -233,21 +252,24 @@ impl WgpuContext {
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<Vec<f32>, &str> {
-        self.queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &self.input_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            bytemuck::cast_slice(input_image.as_raw()),
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(self.input_width * 4),
-                rows_per_image: Some(self.input_height),
-            },
-            self.input_texture_size,
-        );
+        self.queue
+            .write_buffer(&self.input_buffer, 0, input_image.as_raw());
+
+        // self.queue.write_texture(
+        //     wgpu::ImageCopyTexture {
+        //         texture: &self.input_texture,
+        //         mip_level: 0,
+        //         origin: wgpu::Origin3d::ZERO,
+        //         aspect: wgpu::TextureAspect::All,
+        //     },
+        //     bytemuck::cast_slice(input_image.as_raw()),
+        //     wgpu::ImageDataLayout {
+        //         offset: 0,
+        //         bytes_per_row: Some(self.input_width * 4),
+        //         rows_per_image: Some(self.input_height),
+        //     },
+        //     self.input_buffer_size,
+        // );
 
         // A command encoder executes one or many pipelines.
         // It is to WebGPU what a command buffer is to Vulkan.

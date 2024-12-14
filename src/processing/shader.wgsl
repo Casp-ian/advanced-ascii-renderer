@@ -4,11 +4,11 @@ var<uniform> resolutions: Dimensions;
 
 @group(0)
 @binding(1)
-var inputTexture: texture_2d<f32>;
+var<storage, read_write> inputTexture: array<u32>; // packed u8 color values
 
 @group(0)
 @binding(2)
-var<storage, read_write> intermediateBuffer: array<Test>;
+var<storage, read_write> intermediateBuffer: array<Rotation>;
 
 @group(0)
 @binding(3)
@@ -20,7 +20,8 @@ struct Dimensions {
     outputWidth: u32,
     outputHeight: u32,
 }
-struct Test {
+
+struct Rotation {
     gx: f32,
     gy: f32,
 }
@@ -57,26 +58,26 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
             
     let gx = (
-          1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x - 1, global_id.y - 1), 0).rgb)
-        + 2 * average(textureLoad(inputTexture, vec2<u32>(global_id.x - 1, global_id.y + 0), 0).rgb)
-        + 1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x - 1, global_id.y + 1), 0).rgb)
-        - 1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 1, global_id.y - 1), 0).rgb)
-        - 2 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 1, global_id.y + 0), 0).rgb)
-        - 1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 1, global_id.y + 1), 0).rgb)
+          1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb )
+        + 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 0)] ).rgb )
+        + 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb )
+        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb )
+        - 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 0)] ).rgb )
+        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb )
     );
     let gy = (
-          1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x - 1, global_id.y - 1), 0).rgb)
-        + 2 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 0, global_id.y - 1), 0).rgb)
-        + 1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 1, global_id.y - 1), 0).rgb)
-        - 1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x - 1, global_id.y + 1), 0).rgb)
-        - 2 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 0, global_id.y + 1), 0).rgb)
-        - 1 * average(textureLoad(inputTexture, vec2<u32>(global_id.x + 1, global_id.y + 1), 0).rgb)
+          1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb )
+        + 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y - 1)] ).rgb )
+        + 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb )
+        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb )
+        - 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y + 1)] ).rgb )
+        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb )
     );
 
     // TODO, how do i improve the soble edge detection, could use DoG, or some other approach making use of our weird scaling situation
 
     // textureStore(outputBuffer, global_id.xy, vec4<f32>(gx, gy, 0.0, 0.0));
-    intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Test(gx, gy);
+    intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(gx, gy);
 }
 
 @compute
@@ -85,7 +86,8 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let outsideX = global_id.x * resolutions.inputWidth / resolutions.outputWidth;
     let outsideY = global_id.y * resolutions.inputHeight / resolutions.outputHeight;
 
-    let colorPixel = textureLoad(inputTexture, vec2<u32>(outsideX, outsideY), 0);
+    let packedColorPixel = inputTexture[coordsInput(outsideX, outsideY)];
+    let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
     let intermediatePixel = intermediateBuffer[coordsInput(outsideX, outsideY)];
 
     // TODO alpha influence?
