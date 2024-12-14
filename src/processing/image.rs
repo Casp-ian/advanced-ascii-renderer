@@ -1,13 +1,13 @@
 use std::f32::consts::PI;
-use std::io::Cursor;
 
-use image::{DynamicImage, GenericImageView, Rgb, Rgba};
+use image::{DynamicImage, GenericImageView, Rgb};
 use pollster::FutureExt;
 
 use super::gpu::WgpuContext;
 use crate::processing::gpu;
 use crate::processing::terminal::get_cols_and_rows;
-use crate::{translate_to_text, Args};
+use crate::processing::text::translate_to_text;
+use crate::Args;
 
 #[derive(Clone, Debug)]
 pub struct PixelData {
@@ -31,13 +31,13 @@ pub struct Magic {
 }
 impl Magic {
     pub fn new(args: Args) -> Magic {
-        // NOTE gpu gets setup on the first run, because we need image aspect ratio for it
+        // gpu gets setup on the first run, because we need image aspect ratio for it
         return Magic { args, gpu: None };
     }
 
-    fn setup_gpu(&mut self, columns: u32, rows: u32) {
+    fn setup_gpu(&mut self, gpu_image_width: u32, gpu_image_height: u32, columns: u32, rows: u32) {
         self.gpu = Some(
-            gpu::WgpuContext::setup(256, 160, columns, rows)
+            gpu::WgpuContext::setup(gpu_image_width, gpu_image_height, columns, rows)
                 .block_on()
                 .unwrap(),
         );
@@ -54,16 +54,23 @@ impl Magic {
             image_height,
         );
 
-        eprintln!("c{}, r{}", columns, rows);
+        // TODO get rid of this resize, it might be a big performance problem right now
+        // the gpu wants bytes per row to be 256 bytes alligned, so we do this to make it so
+        let gpu_image_width = image_width - (image_width % 64);
+        let gpu_image_height = gpu_image_width * image_height / image_width;
 
         // TODO handle failure
         if self.gpu.is_none() {
-            self.setup_gpu(columns, rows);
+            self.setup_gpu(gpu_image_width, gpu_image_height, columns, rows);
         }
         let gpu = self.gpu.as_ref().unwrap();
 
         let color_buffer = image
-            .resize_to_fill(256, 160, image::imageops::FilterType::Nearest)
+            .resize_to_fill(
+                gpu_image_width,
+                gpu_image_height,
+                image::imageops::FilterType::Nearest,
+            )
             .to_rgba8();
         let buffer = gpu.process(color_buffer).block_on().unwrap();
 

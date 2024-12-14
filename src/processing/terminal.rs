@@ -36,15 +36,6 @@ pub fn calculate_other_side_by_aspect(
     target_aspect_x: u32,
     target_aspect_y: u32,
 ) -> u32 {
-    eprintln!(
-        "perceived source aspect ratio: {}",
-        source_aspect_x as f32 / source_aspect_y as f32
-    );
-    eprintln!(
-        "perceived target aspect ratio: {}",
-        target_aspect_x as f32 / target_aspect_y as f32
-    );
-
     (x as f32 * (target_aspect_y as f32 / source_aspect_y as f32)
         / (target_aspect_x as f32 / source_aspect_x as f32))
         .floor() as u32 //floor or round?

@@ -1,4 +1,4 @@
-use image::{DynamicImage, Rgba};
+use image::Rgba;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct WgpuContext {
@@ -233,11 +233,6 @@ impl WgpuContext {
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<Vec<f32>, &str> {
-        // TODO validate if sizes are sensible?
-        // if &size_of_val(input_image) != size {
-        //     return Err("input size changed");
-        // }
-
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.input_texture,
@@ -284,25 +279,6 @@ impl WgpuContext {
             compute_pass.dispatch_workgroups(self.output_width, self.output_height, 1);
         }
 
-        // Sets adds copy operation to command encoder.
-        // Will copy data from storage buffer on GPU to staging buffer on CPU.
-        // encoder.copy_texture_to_buffer(
-        //     wgpu::ImageCopyTextureBase {
-        //         texture: &self.output_storage_buffer,
-        //         mip_level: 0,
-        //         origin: wgpu::Origin3d::ZERO,
-        //         aspect: wgpu::TextureAspect::All,
-        //     },
-        //     wgpu::ImageCopyBufferBase {
-        //         buffer: &self.output_staging_buffer,
-        //         layout: wgpu::ImageDataLayout {
-        //             offset: 0,
-        //             bytes_per_row: Some(self.input_width * 4),
-        //             rows_per_image: Some(self.input_height),
-        //         },
-        //     },
-        //     self.input_texture_size,
-        // );
         encoder.copy_buffer_to_buffer(
             &self.output_storage_buffer,
             0,
