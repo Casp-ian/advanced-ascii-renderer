@@ -2,13 +2,13 @@
 @binding(0)
 var inputTexture: texture_2d<f32>;
 
-@group(0)
-@binding(1)
-var outputTexture: texture_storage_2d<rgba8snorm, write>; // this is used as both input and output for convenience
-
 // @group(0)
 // @binding(1)
-// var<storage, read_write> outputTexture: array<vec4<f32>>; // this is used as both input and output for convenience
+// var outputTexture: texture_storage_2d<rgba8snorm, write>; // this is used as both input and output for convenience
+
+@group(0)
+@binding(1)
+var<storage, read_write> outputTexture: array<vec4<f32>>; // this is used as.0 bo.0th input and output for convenience
 
 @group(0)
 @binding(2)
@@ -52,5 +52,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     // TODO, how do i improve the soble edge detection, could use DoG, or some other approach making use of our weird scaling situation
 
-    textureStore(outputTexture, global_id.xy, vec4<f32>(gx, gy, 0.0, 0.0));
+    // textureStore(outputTexture, global_id.xy, vec4<f32>(gx, gy, 0.0, 0.0));
+    outputTexture[coords(global_id.x, global_id.y)] = vec4<f32>(gx, gy, 0.0, 0.0);
 }

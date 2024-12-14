@@ -4,11 +4,11 @@ use std::io::Cursor;
 use image::{DynamicImage, Rgb, Rgba};
 use pollster::FutureExt;
 
+use super::gpu::WgpuContext;
 use crate::processing::cpu::process_on_cpu;
 use crate::processing::gpu;
-use crate::{translate_to_text, Args};
 use crate::processing::terminal::get_cols_and_rows;
-use super::gpu::WgpuContext;
+use crate::{translate_to_text, Args};
 
 #[derive(Clone, Debug)]
 pub struct PixelData {
@@ -95,9 +95,9 @@ impl Magic {
     }
 }
 
-fn get_direction(gx: i8, gy: i8) -> Direction {
-    let gx = gx as f32 / 128.0;
-    let gy = gy as f32 / 128.0;
+fn get_direction(gx: f32, gy: f32) -> Direction {
+    // let gx = gx as f32 / 128.0;
+    // let gy = gy as f32 / 128.0;
 
     let magnitude_threshold = 0.8;
     let magnitude = (gx.powi(2) + gy.powi(2)).sqrt();

@@ -1,4 +1,5 @@
 use image::{DynamicImage, Rgba};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct WgpuContext {
     device: wgpu::Device,
@@ -6,7 +7,7 @@ pub struct WgpuContext {
     pipeline: wgpu::ComputePipeline,
     bind_group: wgpu::BindGroup,
     input_texture: wgpu::Texture,
-    output_storage_texture: wgpu::Texture,
+    output_storage_buffer: wgpu::Buffer,
     output_staging_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     input_width: u32,
@@ -74,7 +75,7 @@ impl WgpuContext {
         // mappable, CPU-accessible buffer which we'll create here.
 
         // this one lives on the CPU i think
-        let output_buffer_size = (image_width * image_height * 4) as wgpu::BufferAddress;
+        let output_buffer_size = (image_width * image_height * 16) as wgpu::BufferAddress;
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
             size: output_buffer_size,
@@ -83,25 +84,24 @@ impl WgpuContext {
         });
 
         // this one lives on GPU
-        let output_storage_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("storage texture"),
-            size: input_texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Snorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING
-                | wgpu::TextureUsages::STORAGE_BINDING
-                | wgpu::TextureUsages::COPY_SRC
-                | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[wgpu::TextureFormat::Rgba8Snorm],
+        let output_storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("staging buffer"),
+            size: output_buffer_size,
+            usage: wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
-        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("uniform buffer"),
-            size: 16 as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
-            mapped_at_creation: false,
+            contents: bytemuck::cast_slice::<u32, u8>(&[
+                image_width,
+                image_height,
+                output_width,
+                output_height,
+            ]),
         });
 
         // This can be though of as the function signature for our CPU-GPU function.
@@ -163,10 +163,11 @@ impl WgpuContext {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(
-                        &output_storage_texture
-                            .create_view(&wgpu::TextureViewDescriptor::default()),
-                    ),
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &output_storage_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
@@ -185,7 +186,7 @@ impl WgpuContext {
             pipeline,
             bind_group,
             input_texture,
-            output_storage_texture,
+            output_storage_buffer,
             output_staging_buffer,
             uniform_buffer,
             input_width: image_width,
@@ -200,7 +201,7 @@ impl WgpuContext {
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
-    ) -> Result<Vec<i8>, &str> {
+    ) -> Result<Vec<f32>, &str> {
         // TODO
         // if &size_of_val(input_image) != size {
         //     return Err("input size changed");
@@ -255,22 +256,29 @@ impl WgpuContext {
 
         // Sets adds copy operation to command encoder.
         // Will copy data from storage buffer on GPU to staging buffer on CPU.
-        encoder.copy_texture_to_buffer(
-            wgpu::ImageCopyTextureBase {
-                texture: &self.output_storage_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::ImageCopyBufferBase {
-                buffer: &self.output_staging_buffer,
-                layout: wgpu::ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(self.input_width * 4),
-                    rows_per_image: Some(self.input_height),
-                },
-            },
-            self.input_texture_size,
+        // encoder.copy_texture_to_buffer(
+        //     wgpu::ImageCopyTextureBase {
+        //         texture: &self.output_storage_buffer,
+        //         mip_level: 0,
+        //         origin: wgpu::Origin3d::ZERO,
+        //         aspect: wgpu::TextureAspect::All,
+        //     },
+        //     wgpu::ImageCopyBufferBase {
+        //         buffer: &self.output_staging_buffer,
+        //         layout: wgpu::ImageDataLayout {
+        //             offset: 0,
+        //             bytes_per_row: Some(self.input_width * 4),
+        //             rows_per_image: Some(self.input_height),
+        //         },
+        //     },
+        //     self.input_texture_size,
+        // );
+        encoder.copy_buffer_to_buffer(
+            &self.output_storage_buffer,
+            0,
+            &self.output_staging_buffer,
+            0,
+            self.output_buffer_size,
         );
 
         // Submits command encoder for processing
@@ -292,7 +300,7 @@ impl WgpuContext {
             // Gets contents of buffer
             let data = buffer_slice.get_mapped_range();
             // Since contents are got in bytes, this converts these bytes back to u32
-            let result = bytemuck::cast_slice(&data).to_vec();
+            let result = bytemuck::cast_slice::<u8, f32>(&data).to_vec();
 
             // With the current interface, we have to make sure all mapped views are
             // dropped before we unmap the buffer.
