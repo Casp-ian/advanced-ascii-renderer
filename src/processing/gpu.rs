@@ -1,5 +1,4 @@
 use image::{DynamicImage, Rgba};
-use pollster::block_on;
 
 pub struct WgpuContext {
     device: wgpu::Device,
@@ -9,8 +8,9 @@ pub struct WgpuContext {
     input_texture: wgpu::Texture,
     output_storage_texture: wgpu::Texture,
     output_staging_buffer: wgpu::Buffer,
-    input_texture_width: u32,
-    input_texture_height: u32,
+    uniform_buffer: wgpu::Buffer,
+    input_width: u32,
+    input_height: u32,
     output_width: u32,
     output_height: u32,
     input_texture_size: wgpu::Extent3d,
@@ -22,7 +22,7 @@ impl WgpuContext {
     pub async fn setup(
         image_width: u32,
         image_height: u32,
-        output_width: u32, // TODO remove?? or keep these for when we rework scaling to be in gpu
+        output_width: u32,
         output_height: u32,
     ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
@@ -58,7 +58,7 @@ impl WgpuContext {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm, // TODO might need to be rgba8Unorm according to examples
+            format: wgpu::TextureFormat::Rgba8Unorm,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -89,12 +89,19 @@ impl WgpuContext {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Snorm, // TODO might need to be rgba8Unorm according to examples
+            format: wgpu::TextureFormat::Rgba8Snorm,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::STORAGE_BINDING
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::COPY_DST,
             view_formats: &[wgpu::TextureFormat::Rgba8Snorm],
+        });
+
+        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("uniform buffer"),
+            size: 16 as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            mapped_at_creation: false,
         });
 
         // This can be though of as the function signature for our CPU-GPU function.
@@ -141,7 +148,7 @@ impl WgpuContext {
             cache: None,
         });
 
-        // NOTE this is needed for the bind group to not break, and i think this will have a nicer way to do in a next version of wgpu
+        // NOTE this is needed for the bind group to not break, and i hope this will have a nicer way to do in a next version of wgpu
         let bind_group_layout = pipeline.get_bind_group_layout(0);
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -161,6 +168,14 @@ impl WgpuContext {
                             .create_view(&wgpu::TextureViewDescriptor::default()),
                     ),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &uniform_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
             ],
         });
 
@@ -172,8 +187,9 @@ impl WgpuContext {
             input_texture,
             output_storage_texture,
             output_staging_buffer,
-            input_texture_width: image_width,
-            input_texture_height: image_height,
+            uniform_buffer,
+            input_width: image_width,
+            input_height: image_height,
             output_width,
             output_height,
             input_texture_size,
@@ -193,6 +209,16 @@ impl WgpuContext {
         // Local buffer contents -> GPU storage buffer
         // Adds a write buffer command to the queue. This command is more complicated
         // than it appears.
+        self.queue.write_buffer(
+            &self.uniform_buffer,
+            0,
+            bytemuck::cast_slice::<u32, u8>(&[
+                self.input_width,
+                self.input_height,
+                self.output_width,
+                self.output_height,
+            ]),
+        );
 
         self.queue.write_texture(
             wgpu::ImageCopyTexture {
@@ -204,8 +230,8 @@ impl WgpuContext {
             bytemuck::cast_slice(input_image.as_raw()),
             wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(self.input_texture_width * 4),
-                rows_per_image: Some(self.input_texture_height),
+                bytes_per_row: Some(self.input_width * 4),
+                rows_per_image: Some(self.input_height),
             },
             self.input_texture_size,
         );
@@ -224,15 +250,7 @@ impl WgpuContext {
             compute_pass.set_bind_group(0, Some(&self.bind_group), &[]);
             compute_pass.insert_debug_marker("compute shader");
 
-            // TODO workgroup count https://blog.redwarp.app/image-filters/
-            // Number of cells to run, the (x,y,z) size of item being processed
-            // TODO this should be output, not input... i think
-            compute_pass.dispatch_workgroups(
-                self.input_texture_width,
-                self.input_texture_height,
-                1,
-            );
-            // TODO fucked according to tutorial
+            compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
         }
 
         // Sets adds copy operation to command encoder.
@@ -248,8 +266,8 @@ impl WgpuContext {
                 buffer: &self.output_staging_buffer,
                 layout: wgpu::ImageDataLayout {
                     offset: 0,
-                    bytes_per_row: Some(self.input_texture_width * 4),
-                    rows_per_image: Some(self.input_texture_height),
+                    bytes_per_row: Some(self.input_width * 4),
+                    rows_per_image: Some(self.input_height),
                 },
             },
             self.input_texture_size,
