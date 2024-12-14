@@ -1,12 +1,7 @@
-use std::io::Cursor;
-
 use image::{DynamicImage, Rgba};
 use pollster::block_on;
 
-use crate::{Args, PixelData};
-
 pub struct WgpuContext {
-    failed: bool,
     device: wgpu::Device,
     queue: wgpu::Queue,
     pipeline: wgpu::ComputePipeline,
@@ -170,7 +165,6 @@ impl WgpuContext {
         });
 
         return Ok(WgpuContext {
-            failed: false,
             device,
             queue,
             pipeline,

@@ -6,8 +6,8 @@ use pollster::FutureExt;
 
 use crate::processing::cpu::process_on_cpu;
 use crate::processing::gpu;
-use crate::{get_cols_and_rows, translate_to_text, Args};
-
+use crate::{translate_to_text, Args};
+use crate::processing::terminal::get_cols_and_rows;
 use super::gpu::WgpuContext;
 
 #[derive(Clone, Debug)]

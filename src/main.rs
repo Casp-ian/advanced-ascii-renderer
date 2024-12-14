@@ -88,90 +88,6 @@ enum CharSet {
     Discord,
 }
 
-fn get_cols_and_rows(
-    char_width: u32,
-    char_height: u32,
-    columns: Option<u32>,
-    rows: Option<u32>,
-    image_width: u32,
-    image_height: u32,
-) -> (u32, u32) {
-    let (columns, rows) = match (columns, rows) {
-        (Some(x), Some(y)) => {
-            eprintln!(
-                "you specified both image collumns and rows, image aspect ratio might be messed up"
-            );
-            return (x, y);
-        }
-        (Some(x), None) => (
-            x,
-            calculate_other_side_by_aspect(x, char_height, char_width, image_height, image_width),
-        ),
-        (None, Some(y)) => (
-            calculate_other_side_by_aspect(y, char_width, char_height, image_width, image_height),
-            y,
-        ),
-        (None, None) => get_fitting_terminal(char_width, char_height, image_width, image_height),
-    };
-
-    (columns, rows)
-}
-
-fn calculate_other_side_by_aspect(
-    x: u32,
-    source_aspect_x: u32,
-    source_aspect_y: u32,
-    target_aspect_x: u32,
-    target_aspect_y: u32,
-) -> u32 {
-    (x as f32 * (target_aspect_y as f32 / source_aspect_y as f32)
-        / (target_aspect_x as f32 / source_aspect_x as f32))
-        .floor() as u32 //floor or round?
-}
-
-fn get_fitting_terminal(
-    char_width: u32,
-    char_height: u32,
-    image_width: u32,
-    image_height: u32,
-) -> (u32, u32) {
-    let max_terminal_chars_x: u32;
-    let max_terminal_chars_y: u32;
-
-    if let Ok(size) = terminal::size() {
-        max_terminal_chars_x = size.0 as u32;
-        max_terminal_chars_y = size.1 as u32 - 3; // minus 3 to adjust for prompt size, maybe we can actually get that prompt height somehow, but well try later
-    } else {
-        max_terminal_chars_x = 200;
-        max_terminal_chars_y = 50;
-        eprintln!(
-            "Could not get width and height from terminal, resorting to hardcoded {} by {}",
-            max_terminal_chars_x, max_terminal_chars_y
-        );
-    }
-
-    let y_chars = calculate_other_side_by_aspect(
-        max_terminal_chars_x,
-        char_width,
-        char_height,
-        image_width,
-        image_height,
-    );
-
-    if y_chars <= max_terminal_chars_y {
-        return (y_chars, max_terminal_chars_x);
-    }
-
-    let x_chars = calculate_other_side_by_aspect(
-        max_terminal_chars_y,
-        char_height,
-        char_width,
-        image_height,
-        image_width,
-    );
-    return (max_terminal_chars_y, x_chars);
-}
-
 fn do_before_exit() {
     // TODO the filename is still arbitrary right now
     let _ = Command::new("rm").arg("shit.png").output();
@@ -180,6 +96,7 @@ fn do_before_exit() {
 
 fn main() {
     // functionality can still go ahead, even if we cant clean up after the user presses ctrl c
+    // TODO use this to make sure everything exits, not just audio
     let _ = ctrlc::set_handler(do_before_exit);
 
     let args = Args::parse();
