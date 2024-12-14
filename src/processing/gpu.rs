@@ -25,8 +25,8 @@ pub struct WgpuContext {
 impl WgpuContext {
     // TODO get rid of unwraps for better error messages
     pub async fn setup(
-        image_width: u32,
-        image_height: u32,
+        input_width: u32,
+        input_height: u32,
         output_width: u32,
         output_height: u32,
     ) -> Result<WgpuContext, String> {
@@ -52,8 +52,8 @@ impl WgpuContext {
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
         let input_texture_size = wgpu::Extent3d {
-            width: image_width,
-            height: image_height,
+            width: input_width,
+            height: input_height,
             depth_or_array_layers: 1,
         };
 
@@ -78,7 +78,8 @@ impl WgpuContext {
         // (which we will later) to copy the buffer modified by the GPU into a
         // mappable, CPU-accessible buffer which we'll create here.
 
-        let intermediate_buffer_size = (image_width * image_height * 16) as wgpu::BufferAddress;
+        // 2 f32 for every pixel
+        let intermediate_buffer_size = (input_width * input_height * 8) as wgpu::BufferAddress;
         // this one lives on GPU
         let intermediate_storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
@@ -89,8 +90,9 @@ impl WgpuContext {
             mapped_at_creation: false,
         });
 
+        // 6 f32 for every pixel, 4 bytes for every f32, 6 * 4 = 24
+        let output_buffer_size = (output_width * output_height * 24) as wgpu::BufferAddress;
         // this one lives on the CPU i think
-        let output_buffer_size = (image_width * image_height * 16) as wgpu::BufferAddress;
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
             size: output_buffer_size,
@@ -112,8 +114,8 @@ impl WgpuContext {
             label: Some("uniform buffer"),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
             contents: bytemuck::cast_slice::<u32, u8>(&[
-                image_width,
-                image_height,
+                input_width,
+                input_height,
                 output_width,
                 output_height,
             ]),
@@ -181,6 +183,12 @@ impl WgpuContext {
                     }),
                 },
                 wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(
+                        &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                    ),
+                },
+                wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &intermediate_storage_buffer,
@@ -211,8 +219,8 @@ impl WgpuContext {
             output_storage_buffer,
             output_staging_buffer,
             uniform_buffer,
-            input_width: image_width,
-            input_height: image_height,
+            input_width,
+            input_height,
             output_width,
             output_height,
             input_texture_size,
@@ -273,7 +281,7 @@ impl WgpuContext {
             compute_pass.set_bind_group(0, Some(&self.bind_group_scale), &[]);
             compute_pass.insert_debug_marker("scale");
 
-            compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
+            compute_pass.dispatch_workgroups(self.output_width, self.output_height, 1);
         }
 
         // Sets adds copy operation to command encoder.
@@ -321,8 +329,10 @@ impl WgpuContext {
         if let Ok(Ok(())) = receiver.recv_async().await {
             // Gets contents of buffer
             let data = buffer_slice.get_mapped_range();
+
             // Since contents are got in bytes, this converts these bytes back to u32
-            let result = bytemuck::cast_slice::<u8, f32>(&data).to_vec();
+            let result = bytemuck::cast_slice(&data).to_vec();
+            // let result = data.to_vec();
 
             // With the current interface, we have to make sure all mapped views are
             // dropped before we unmap the buffer.

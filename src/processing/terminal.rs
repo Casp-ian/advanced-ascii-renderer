@@ -17,10 +17,10 @@ pub fn get_cols_and_rows(
         }
         (Some(x), None) => (
             x,
-            calculate_other_side_by_aspect(x, char_height, char_width, image_height, image_width),
+            calculate_other_side_by_aspect(x, char_width, char_height, image_width, image_height),
         ),
         (None, Some(y)) => (
-            calculate_other_side_by_aspect(y, char_width, char_height, image_width, image_height),
+            calculate_other_side_by_aspect(y, char_height, char_width, image_height, image_width),
             y,
         ),
         (None, None) => get_fitting_terminal(char_width, char_height, image_width, image_height),
@@ -36,6 +36,15 @@ pub fn calculate_other_side_by_aspect(
     target_aspect_x: u32,
     target_aspect_y: u32,
 ) -> u32 {
+    eprintln!(
+        "perceived source aspect ratio: {}",
+        source_aspect_x as f32 / source_aspect_y as f32
+    );
+    eprintln!(
+        "perceived target aspect ratio: {}",
+        target_aspect_x as f32 / target_aspect_y as f32
+    );
+
     (x as f32 * (target_aspect_y as f32 / source_aspect_y as f32)
         / (target_aspect_x as f32 / source_aspect_x as f32))
         .floor() as u32 //floor or round?
@@ -71,7 +80,7 @@ pub fn get_fitting_terminal(
     );
 
     if y_chars <= max_terminal_chars_y {
-        return (y_chars, max_terminal_chars_x);
+        return (max_terminal_chars_x, y_chars);
     }
 
     let x_chars = calculate_other_side_by_aspect(
@@ -81,5 +90,5 @@ pub fn get_fitting_terminal(
         image_height,
         image_width,
     );
-    return (max_terminal_chars_y, x_chars);
+    return (x_chars, max_terminal_chars_y);
 }

@@ -1,4 +1,3 @@
-use crate::processing::cpu::get_pixel_data;
 use crate::processing::image::PixelData;
 
 use crate::CharSet;
@@ -24,8 +23,6 @@ const BRIGHT_WHITE: &str = "\x1b[97m";
 
 pub fn translate_to_text(
     image: Vec<Vec<PixelData>>,
-    columns: u32,
-    rows: u32,
     set: CharSet,
     color: ColorSet,
     inverted: bool,
@@ -34,25 +31,25 @@ pub fn translate_to_text(
     let mut result = "".to_string();
 
     // iterate over parts of image
-    for y in 0..columns {
-        let pixel_y_min = (image.len() as f32 * y as f32 / columns as f32) as u32;
-        let pixel_y_max = (image.len() as f32 * (y + 1) as f32 / columns as f32) as u32;
+    for y in image {
+        // let pixel_y_min = (image.len() as f32 * y as f32 / columns as f32) as u32;
+        // let pixel_y_max = (image.len() as f32 * (y + 1) as f32 / columns as f32) as u32;
 
         // this is effectively the downscaling part, and needs to be looked into
-        for x in 0..rows {
-            let pixel_x_min =
-                (image.get(0).unwrap().len() as f32 * (x as f32 / rows as f32)) as u32;
-            let pixel_x_max =
-                (image.get(0).unwrap().len() as f32 * ((x + 1) as f32 / rows as f32)) as u32;
+        for x in y {
+            // let pixel_x_min =
+            //     (image.get(0).unwrap().len() as f32 * (x as f32 / rows as f32)) as u32;
+            // let pixel_x_max =
+            //     (image.get(0).unwrap().len() as f32 * ((x + 1) as f32 / rows as f32)) as u32;
 
-            // TODO after we fix the whole resolution thing all data will already be inside the value, so this wont be needed anymore
-            // TODO dont only get the center pixel, look at all pixels to decide the character, like in acerola's video
-            let pixel = get_pixel_data(&image, pixel_x_min, pixel_x_max, pixel_y_min, pixel_y_max);
+            // // TODO after we fix the whole resolution thing all data will already be inside the value, so this wont be needed anymore
+            // // TODO dont only get the center pixel, look at all pixels to decide the character, like in acerola's video
+            // let pixel = get_pixel_data(&image, pixel_x_min, pixel_x_max, pixel_y_min, pixel_y_max);
 
-            result += get_ansi_color_code(&color, pixel.color.0).as_str();
+            result += get_ansi_color_code(&color, x.color.0).as_str();
 
             // place char in result string
-            result += get_char(&set, pixel, inverted, no_lines).as_str();
+            result += get_char(&set, x, inverted, no_lines).as_str();
         }
         result += "\n";
     }
