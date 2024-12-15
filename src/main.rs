@@ -91,13 +91,17 @@ enum CharSet {
 fn do_before_exit() {
     // TODO the filename is still arbitrary right now
     let _ = Command::new("rm").arg("shit.png").output();
+    // TODO stop audio
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
 fn main() {
     // functionality can still go ahead, even if we cant clean up after the user presses ctrl c
-    // TODO use this to make sure everything exits, not just audio
+    // TODO use this to make sure everything exits
     let _ = ctrlc::set_handler(do_before_exit);
+
+    // TODO rework video, image and stream into seperate modes
+    // also make sure .gif falls into video, not immage
 
     let args = Args::parse();
 
@@ -118,7 +122,6 @@ fn main() {
         return;
     } else {
         eprintln!("Cannot open as an image");
-        // TODO does the reader_result memmory get cleared???
     }
 
     // TRY VIDEO =====
@@ -154,7 +157,6 @@ struct VideoThing {
 }
 impl VideoThing {
     fn new(path: &PathBuf, args: Args) -> Result<VideoThing, String> {
-        // TODO disable when targeting webcam
         let length: f32;
         if !args.stream {
             let command_result = Command::new("ffprobe")

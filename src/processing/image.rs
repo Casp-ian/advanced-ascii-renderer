@@ -54,24 +54,12 @@ impl Magic {
             image_height,
         );
 
-        // // TODO get rid of this resize, it might be a big performance problem right now
-        // // the gpu wants bytes per row to be 256 bytes alligned, so we do this to make it so
-        // let gpu_image_width = image_width - (image_width % 64);
-        // let gpu_image_height = gpu_image_width * image_height / image_width;
-
         // TODO handle failure
         if self.gpu.is_none() {
             self.setup_gpu(image_width, image_height, columns, rows);
         }
-        let gpu = self.gpu.as_ref().unwrap();
 
-        // let color_buffer = image
-        //     .resize_to_fill(
-        //         gpu_image_width,
-        //         gpu_image_height,
-        //         image::imageops::FilterType::Nearest,
-        //     )
-        //     .to_rgba8();
+        let gpu = self.gpu.as_ref().unwrap();
         let buffer = gpu.process(image.to_rgba8()).block_on().unwrap();
 
         let data: Vec<PixelData> = buffer

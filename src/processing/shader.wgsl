@@ -54,7 +54,9 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     if (global_id.x >= resolutions.inputWidth - 1) || (global_id.y >= resolutions.inputHeight - 1) {
         return;
     }
-            
+
+    // TODO move more cpu stuff into here
+    
     let gx = (
           1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb )
         + 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 0)] ).rgb )
@@ -72,9 +74,6 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb )
     );
 
-    // TODO, how do i improve the soble edge detection, could use DoG, or some other approach making use of our weird scaling situation
-
-    // textureStore(outputBuffer, global_id.xy, vec4<f32>(gx, gy, 0.0, 0.0));
     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(gx, gy);
 }
 
@@ -87,6 +86,9 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let packedColorPixel = inputTexture[coordsInput(outsideX, outsideY)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
     let intermediatePixel = intermediateBuffer[coordsInput(outsideX, outsideY)];
+    // TODO grab more surrounding pixels to scale down better
+    // especialy the angles
+
 
     // TODO alpha influence?
     let brightness = (colorPixel.r * 0.2126) + (colorPixel.g * 0.7152) + (colorPixel.b * 0.0722); 
