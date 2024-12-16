@@ -22,7 +22,7 @@ const BRIGHT_CYAN: &str = "\x1b[96m";
 const BRIGHT_WHITE: &str = "\x1b[97m";
 
 pub fn translate_to_text(
-    image: Vec<Vec<PixelData>>,
+    data: Vec<Vec<PixelData>>,
     set: CharSet,
     color: ColorSet,
     inverted: bool,
@@ -30,12 +30,13 @@ pub fn translate_to_text(
 ) -> String {
     let mut result = "".to_string();
 
-    // iterate over parts of image
-    for y in image {
-        for x in y {
-            result += get_ansi_color_code(&color, x.color.0).as_str();
+    // TODO also not really pixels
+    // iterate over pixel data
+    for row in data {
+        for data in row {
+            result += get_ansi_color_code(&color, data.color.0).as_str();
 
-            result += get_char(&set, x, inverted, no_lines).as_str();
+            result += get_char(&set, data, inverted, no_lines).as_str();
         }
         result += "\n";
     }
@@ -44,90 +45,14 @@ pub fn translate_to_text(
 }
 
 pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 3]) -> String {
-    let set: Vec<(&str, [u8; 3])>;
-
-    if color_set == &ColorSet::ColorFull {
-        set = vec![
-            // (BLACK, [0, 0, 0]),
-            (RED, [170, 0, 0]),
-            (GREEN, [0, 170, 0]),
-            (YELLOW, [170, 170, 0]),
-            (BLUE, [0, 0, 170]),
-            (MAGENTA, [170, 0, 170]),
-            (CYAN, [0, 170, 170]),
-            // (WHITE, [170, 170, 170]),
-            // (GRAY, [85, 85, 85]),
-            (BRIGHT_RED, [255, 85, 85]),
-            (BRIGHT_GREEN, [85, 255, 85]),
-            (BRIGHT_YELLOW, [255, 255, 85]),
-            (BRIGHT_BLUE, [85, 85, 255]),
-            (BRIGHT_MANGENTA, [255, 85, 255]),
-            (BRIGHT_CYAN, [85, 255, 255]),
-            // (BRIGHT_WHITE, [255, 255, 255]),
-        ];
-    } else if color_set == &ColorSet::All {
-        set = vec![
-            (BLACK, [0, 0, 0]),
-            (RED, [170, 0, 0]),
-            (GREEN, [0, 170, 0]),
-            (YELLOW, [170, 170, 0]),
-            (BLUE, [0, 0, 170]),
-            (MAGENTA, [170, 0, 170]),
-            (CYAN, [0, 170, 170]),
-            (WHITE, [170, 170, 170]),
-            (GRAY, [85, 85, 85]),
-            (BRIGHT_RED, [255, 85, 85]),
-            (BRIGHT_GREEN, [85, 255, 85]),
-            (BRIGHT_YELLOW, [255, 255, 85]),
-            (BRIGHT_BLUE, [85, 85, 255]),
-            (BRIGHT_MANGENTA, [255, 85, 255]),
-            (BRIGHT_CYAN, [85, 255, 255]),
-            (BRIGHT_WHITE, [255, 255, 255]),
-        ];
-    } else if color_set == &ColorSet::FewColors {
-        set = vec![
-            // (BLACK, [0, 0, 0]),
-            // (RED, [170, 0, 0]),
-            // (GREEN, [0, 170, 0]),
-            // (YELLOW, [170, 170, 0]),
-            // (BLUE, [0, 0, 170]),
-            // (MAGENTA, [170, 0, 170]),
-            // (CYAN, [0, 170, 170]),
-            (WHITE, [170, 170, 170]),
-            // (GRAY, [85, 85, 85]),
-            (BRIGHT_RED, [255, 85, 85]),
-            (BRIGHT_GREEN, [85, 255, 85]),
-            (BRIGHT_YELLOW, [255, 255, 85]),
-            (BRIGHT_BLUE, [85, 85, 255]),
-            (BRIGHT_MANGENTA, [255, 85, 255]),
-            (BRIGHT_CYAN, [85, 255, 255]),
-            // (BRIGHT_WHITE, [255, 255, 255]),
-        ];
-    } else if color_set == &ColorSet::Real {
+    // TODO get some info on where the ansi codes work and dont
+    // TODO this also needs to change for other color modes like html
+    // TODO also color quantization, but that should happen in shader.wgsl
+    if color_set == &ColorSet::All {
         return format!("\x1b[38;2;{};{};{}m", color[0], color[1], color[2]).to_string();
     } else {
         return "".to_string();
     }
-
-    // TODO this color quantization method sucks balls, maybe acerola can save us here as well https://www.youtube.com/watch?v=fv-wlo8yVhk
-    let mut lowest_distance: usize = 0;
-    let mut chosen_text: &str = "";
-
-    for (text, text_color) in set {
-        let distance = get_distance(color, text_color);
-        if distance > lowest_distance {
-            lowest_distance = distance;
-            chosen_text = text;
-        }
-    }
-
-    return chosen_text.to_string();
-}
-
-fn get_distance(one: [u8; 3], two: [u8; 3]) -> usize {
-    let distance =
-        ((one[0] + two[0]).pow(2) + (one[1] + two[1]).pow(2) + (one[2] + two[2]).pow(2)) as f32;
-    return distance.sqrt() as usize;
 }
 
 pub fn get_char(char_set: &CharSet, pixel: PixelData, inverted: bool, no_lines: bool) -> String {

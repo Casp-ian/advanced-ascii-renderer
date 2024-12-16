@@ -87,8 +87,8 @@ impl WgpuContext {
         // (which we will later) to copy the buffer modified by the GPU into a
         // mappable, CPU-accessible buffer which we'll create here.
 
-        // 2 f32 for every pixel 2 * 4 = 8
-        let intermediate_buffer_size = (input_width * input_height * 8) as wgpu::BufferAddress;
+        // 1 u32 enum for every pixel 1 * 4 = 4
+        let intermediate_buffer_size = (input_width * input_height * 4) as wgpu::BufferAddress;
         // this one lives on GPU
         let intermediate_storage_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
@@ -99,8 +99,8 @@ impl WgpuContext {
             mapped_at_creation: false,
         });
 
-        // 4 f32 for every pixel, 4 bytes for every f32, 4 * 4 = 16
-        let output_buffer_size = (output_width * output_height * 16) as wgpu::BufferAddress;
+        // 3 f32 for every pixel, 4 bytes for every f32, 3 * 4 = 12
+        let output_buffer_size = (output_width * output_height * 12) as wgpu::BufferAddress;
         // this one lives on the CPU i think
         let output_staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("staging buffer"),
@@ -248,28 +248,14 @@ impl WgpuContext {
         });
     }
 
+    // NOTE this functions return type isnt really representative, most of the values will be reinterpreted into something other than f32
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<Vec<f32>, &str> {
+        // will get the image to process to the gpu
         self.queue
             .write_buffer(&self.input_buffer, 0, input_image.as_raw());
-
-        // self.queue.write_texture(
-        //     wgpu::ImageCopyTexture {
-        //         texture: &self.input_texture,
-        //         mip_level: 0,
-        //         origin: wgpu::Origin3d::ZERO,
-        //         aspect: wgpu::TextureAspect::All,
-        //     },
-        //     bytemuck::cast_slice(input_image.as_raw()),
-        //     wgpu::ImageDataLayout {
-        //         offset: 0,
-        //         bytes_per_row: Some(self.input_width * 4),
-        //         rows_per_image: Some(self.input_height),
-        //     },
-        //     self.input_buffer_size,
-        // );
 
         // A command encoder executes one or many pipelines.
         // It is to WebGPU what a command buffer is to Vulkan.
@@ -301,6 +287,7 @@ impl WgpuContext {
             compute_pass.dispatch_workgroups(self.output_width, self.output_height, 1);
         }
 
+        // will get the output back to the cpu
         encoder.copy_buffer_to_buffer(
             &self.output_storage_buffer,
             0,
@@ -314,6 +301,7 @@ impl WgpuContext {
 
         // Note that we're not calling `.await` here.
         let buffer_slice = self.output_staging_buffer.slice(..);
+
         // Sets the buffer up for mapping, sending over the result of the mapping back to us when it is finished.
         let (sender, receiver) = flume::bounded(1);
         buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());

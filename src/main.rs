@@ -9,12 +9,11 @@ use crossterm::terminal::{self, Clear, EnterAlternateScreen, LeaveAlternateScree
 
 mod processing;
 use processing::image::*;
-use processing::text::*;
 
 use std::process::{Command, Output};
 
 /// Take an image and turn it into text
-#[derive(Parser, Debug, Clone)] // TODO unimplement clone and finally just fucking learn how to specify lifetimes
+#[derive(Parser, Debug)]
 #[command(author, version, about)]
 struct Args {
     /// Path of image
@@ -52,7 +51,7 @@ struct Args {
     #[arg(long)]
     inverted: bool,
 
-    /// remove the lines with /-\|
+    /// remove the lines characters like /-\|
     #[arg(long)]
     no_lines: bool,
 
@@ -72,9 +71,9 @@ enum ColorSet {
     #[default]
     None,
     All,
-    ColorFull,
-    FewColors,
-    Real,
+    // ColorFull,
+    // FewColors,
+    // Real,
 }
 
 // The actual arrays of characters used for the character sets could be stored inside this enum, but i dont think it really matters
@@ -88,29 +87,34 @@ enum CharSet {
     Discord,
 }
 
+const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
+
 fn do_before_exit() {
-    // TODO the filename is still arbitrary right now
-    let _ = Command::new("rm").arg("shit.png").output();
-    // TODO stop audio
+    let _ = Command::new("rm").arg(TEMPORARY_IMAGE_FILE_NAME).output();
+    // functionality sometimes still continues, and i dont know why, even if we cant clean up after the user presses ctrl c
+    // TODO use this to make sure everything exits
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
 fn main() {
-    // functionality can still go ahead, even if we cant clean up after the user presses ctrl c
-    // TODO use this to make sure everything exits
+    let args = Args::parse();
+
     let _ = ctrlc::set_handler(do_before_exit);
 
     // TODO rework video, image and stream into seperate modes
-    // also make sure .gif falls into video, not immage
-
-    let args = Args::parse();
-
-    let path = args.path.clone(); // PARTIAL CLONE>???????!?!?!?!??!>!
-
-    let mut thing = Magic::new(args.clone());
+    // also make sure .gif falls into video, not image
 
     // TRY IMAGE =====
-    let reader_result = Reader::open(path.clone());
+    do_image_stuff(&args);
+
+    // TRY VIDEO =====
+    eprintln!("Trying to open as a video");
+    do_video_stuff(&args);
+}
+
+fn do_image_stuff(args: &Args) {
+    // TRY IMAGE =====
+    let reader_result = Reader::open(&args.path);
     if reader_result.is_err() {
         eprintln!("Cannot find file");
         return;
@@ -118,45 +122,42 @@ fn main() {
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
-        println!("{}", thing.do_magic(image));
+        let mut thing = Textifier::new(&args);
+        println!("{}", thing.to_text(image));
         return;
     } else {
         eprintln!("Cannot open as an image");
     }
-
-    // TRY VIDEO =====
-
-    // maybe create an option to disable trying as video, but it doesnt really matter
-    eprintln!("Trying to open as a video");
-
-    crossterm::execute!(io::stdout(), EnterAlternateScreen);
-    do_video_stuff(thing, path, args);
-    crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
-fn do_video_stuff(mut image_magic_thing: Magic, path: PathBuf, args: Args) {
-    let video_magic = VideoThing::new(&path, args).unwrap();
+fn do_video_stuff(args: &Args) {
+    let mut textifier = Textifier::new(&args);
+    crossterm::execute!(io::stdout(), EnterAlternateScreen);
+
+    let video_textifier = VideoFrameGrabber::new(&args.path, args).unwrap();
     loop {
-        if let Ok(image) = video_magic.get_frame_as_image(&path) {
-            let result = image_magic_thing.do_magic(image);
+        if let Ok(image) = video_textifier.get_frame_as_image(&args.path) {
+            let result = textifier.to_text(image);
             crossterm::execute!(io::stdout(), Clear(terminal::ClearType::All));
             println!("{}", result);
         } else {
             break;
         }
     }
+
+    crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 }
 
 // NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
-// so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now
-struct VideoThing {
-    args: Args,
+// so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now, and can be changed later
+struct VideoFrameGrabber<'a> {
+    args: &'a Args,
     start_time: Instant,
     length: f32,
     intermediate_output: String,
 }
-impl VideoThing {
-    fn new(path: &PathBuf, args: Args) -> Result<VideoThing, String> {
+impl<'b> VideoFrameGrabber<'b> {
+    fn new<'a>(path: &PathBuf, args: &'a Args) -> Result<VideoFrameGrabber<'a>, String> {
         let length: f32;
         if !args.stream {
             let command_result = Command::new("ffprobe")
@@ -174,11 +175,15 @@ impl VideoThing {
                 return Err(error.to_string());
             }
 
-            length = String::from_utf8(command_result.unwrap().stdout)
-                .unwrap()
-                .replace("\n", "")
-                .parse::<f32>()
-                .unwrap();
+            let output = String::from_utf8(command_result.unwrap().stdout).unwrap();
+            if let Ok(number) = output.replace("\n", "").parse::<f32>() {
+                length = number;
+            } else {
+                return Err(format!(
+                    "Could not get video length instead got: {}",
+                    output
+                ));
+            }
         } else {
             length = f32::MAX; // still need to set length, but this wont be checked
         }
@@ -196,11 +201,11 @@ impl VideoThing {
 
         let start_time = Instant::now();
 
-        return Ok(VideoThing {
+        return Ok(VideoFrameGrabber {
             args,
             start_time,
             length,
-            intermediate_output: "shit.png".to_string(),
+            intermediate_output: TEMPORARY_IMAGE_FILE_NAME.to_string(),
         });
     }
 

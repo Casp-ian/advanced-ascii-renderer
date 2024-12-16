@@ -22,13 +22,18 @@ struct Dimensions {
 }
 
 struct Rotation {
-    gx: f32,
-    gy: f32,
+    direction: u32,
 }
+// we dont have enums in wgsl yet
+// 0: None
+// 1: |
+// 2: /
+// 3: -
+// 4: \
 
-struct PixelData { // TODO rename here and in image.rs
-    gx: f32,
-    gy: f32,
+struct PixelData {
+    direction: u32,
+    // gy: f32,
     color: u32,
     brightness: f32,
 }
@@ -44,6 +49,8 @@ fn coordsOutput(x: u32, y: u32) -> u32 {
 fn average(vec: vec3<f32>) -> f32 {
     return dot(vec, vec3<f32>(1.0 / 3.0)); // Efficient averaging using the dot product
 }
+
+const PI = 3.14159265358979323846264338327950288;
 
 @compute
 @workgroup_size(1)
@@ -74,12 +81,51 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb )
     );
 
-    intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(gx, gy);
+    let magnitude_threshold = 0.8;
+    let magnitude = sqrt(pow(gx, 2.0) + pow(gy, 2.0));
+    let dir = atan2(gy, gx);
+
+    if magnitude > magnitude_threshold {
+        if (dir < (2.0 * PI / 3.0) && dir > (PI / 3.0))
+            || (dir < (-2.0 * PI / 3.0) && dir > (-1.0 * PI / 3.0))
+        {
+            // direction = Direction::LeftToRight;
+            intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(3);
+        } else if ((dir < PI / 6.0) && (dir > -1.0 * PI / 6.0))
+            || ((dir > 5.0 * PI / 6.0) || (dir < -5.0 * PI / 6.0))
+        {
+            // direction = Direction::TopToBottom;
+            intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(1);
+        } else if ((dir > PI / 6.0) && (dir < PI / 3.0))
+            || ((dir > -5.0 * PI / 6.0) && (dir < -2.0 * PI / 3.0))
+        {
+            // direction = Direction::ToprightToBotleft;
+            intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(2);
+        } else if ((dir < -1.0 * PI / 6.0) && (dir > -1.0 * PI / 3.0))
+            || ((dir < 5.0 * PI / 6.0) && (dir > 2.0 * PI / 3.0))
+        {
+            // direction = Direction::TopleftToBotright;
+            intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(4);
+        } else {
+            // direction = Direction::None;
+            intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(0);
+        }
+    } else {
+        // direction = Direction::None;
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(0);
+    }
+
 }
 
 @compute
 @workgroup_size(1)
 fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    // square of pixels to take into account when downscaling
+    // let outsideXL = global_id.x * resolutions.inputWidth / (resolutions.outputWidth + 1);
+    // let outsideYL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
+    // let outsideXR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
+    // let outsideYR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
+
     let outsideX = global_id.x * resolutions.inputWidth / resolutions.outputWidth;
     let outsideY = global_id.y * resolutions.inputHeight / resolutions.outputHeight;
 
@@ -94,8 +140,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let brightness = (colorPixel.r * 0.2126) + (colorPixel.g * 0.7152) + (colorPixel.b * 0.0722); 
 
     outputBuffer[coordsOutput(global_id.x, global_id.y)] = PixelData(
-        intermediatePixel.gx,
-        intermediatePixel.gy,
+        intermediatePixel.direction,
         packedColorPixel,
         brightness
     );

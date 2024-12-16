@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use image::{DynamicImage, GenericImageView, Rgb};
 use pollster::FutureExt;
 
@@ -9,6 +7,8 @@ use crate::processing::terminal::get_cols_and_rows;
 use crate::processing::text::translate_to_text;
 use crate::Args;
 
+// TODO this struct actually is used for characters, but also isnt really character data, i dont know what to name this
+// but when you rename it, rename it in shader.wgsl too
 #[derive(Clone, Debug)]
 pub struct PixelData {
     pub direction: Direction,
@@ -16,23 +16,35 @@ pub struct PixelData {
     pub color: Rgb<u8>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub enum Direction {
     None,
     TopToBottom,
     ToprightToBotleft,
-    TopleftToBotright,
     LeftToRight,
+    TopleftToBotright,
+}
+impl Direction {
+    fn test(int: u32) -> Direction {
+        match int {
+            0 => Direction::None,
+            1 => Direction::TopToBottom,
+            2 => Direction::ToprightToBotleft,
+            3 => Direction::LeftToRight,
+            4 => Direction::TopleftToBotright,
+            _ => panic!(),
+        }
+    }
 }
 
-pub struct Magic {
-    args: Args,
+pub struct Textifier<'a> {
+    args: &'a Args,
     gpu: Option<WgpuContext>,
 }
-impl Magic {
-    pub fn new(args: Args) -> Magic {
+impl<'b> Textifier<'b> {
+    pub fn new<'a>(args: &'a Args) -> Textifier<'a> {
         // gpu gets setup on the first run, because we need image aspect ratio for it
-        return Magic { args, gpu: None };
+        return Textifier { args, gpu: None };
     }
 
     fn setup_gpu(&mut self, gpu_image_width: u32, gpu_image_height: u32, columns: u32, rows: u32) {
@@ -43,7 +55,7 @@ impl Magic {
         );
     }
 
-    pub fn do_magic(&mut self, image: DynamicImage) -> String {
+    pub fn to_text(&mut self, image: DynamicImage) -> String {
         let (image_width, image_height) = image.dimensions();
         let (columns, rows) = get_cols_and_rows(
             self.args.char_width,
@@ -54,7 +66,6 @@ impl Magic {
             image_height,
         );
 
-        // TODO handle failure
         if self.gpu.is_none() {
             self.setup_gpu(image_width, image_height, columns, rows);
         }
@@ -63,15 +74,15 @@ impl Magic {
         let buffer = gpu.process(image.to_rgba8()).block_on().unwrap();
 
         let data: Vec<PixelData> = buffer
-            .chunks_exact(4)
+            .chunks_exact(3)
             .map(|x| PixelData {
-                direction: get_direction(x[0], x[1]),
+                direction: Direction::test(bytemuck::cast(x[0])),
                 color: Rgb([
-                    bytemuck::cast_slice::<f32, u8>(&[x[2]])[0],
-                    bytemuck::cast_slice::<f32, u8>(&[x[2]])[1],
-                    bytemuck::cast_slice::<f32, u8>(&[x[2]])[2],
+                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[0],
+                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[1],
+                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[2],
                 ]),
-                brightness: x[3],
+                brightness: x[2],
             })
             .collect();
 
@@ -90,37 +101,4 @@ impl Magic {
 
         return result_string;
     }
-}
-
-fn get_direction(gx: f32, gy: f32) -> Direction {
-    let magnitude_threshold = 0.8;
-    let magnitude = (gx.powi(2) + gy.powi(2)).sqrt();
-    let dir = gy.atan2(gx);
-
-    let direction: Direction;
-    if magnitude > magnitude_threshold {
-        if (dir < (2.0 * PI / 3.0) && dir > (PI / 3.0))
-            || (dir < (-2.0 * PI / 3.0) && dir > (-1.0 * PI / 3.0))
-        {
-            direction = Direction::LeftToRight;
-        } else if ((dir < PI / 6.0) && (dir > -1.0 * PI / 6.0))
-            || ((dir > 5.0 * PI / 6.0) || (dir < -5.0 * PI / 6.0))
-        {
-            direction = Direction::TopToBottom;
-        } else if ((dir > PI / 6.0) && (dir < PI / 3.0))
-            || ((dir > -5.0 * PI / 6.0) && (dir < -2.0 * PI / 3.0))
-        {
-            direction = Direction::ToprightToBotleft;
-        } else if ((dir < -1.0 * PI / 6.0) && (dir > -1.0 * PI / 3.0))
-            || ((dir < 5.0 * PI / 6.0) && (dir > 2.0 * PI / 3.0))
-        {
-            direction = Direction::TopleftToBotright;
-        } else {
-            direction = Direction::None;
-        }
-    } else {
-        direction = Direction::None;
-    }
-
-    return direction;
 }
