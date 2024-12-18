@@ -68,6 +68,10 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
+    // TODO another 'larger kernel' edge detection to make edges thinner
+    // should also maybe be per color
+    // dont even understand why the edges are thick right now
+    
     // we do sobel for every color, so for example the edge between a green and red area are very visible, and not only between white and black
     // maybe all of this sobel stuff needs to be adjusted for color space now?
 
@@ -145,8 +149,8 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     {
         intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(2); // '/'
         
-    } else if (dir <= (2.0 * PI / 3.0) && dir >= (PI / 3.0))
-        || (dir <= (-2.0 * PI / 3.0) && dir >= (-1.0 * PI / 3.0))
+    } else if ((dir <= 2.0 * PI / 3.0) && (dir >= PI / 3.0))
+        || ((dir >= -2.0 * PI / 3.0) && (dir <= -1.0 * PI / 3.0))
     {
         intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(3); // '-'
         
