@@ -64,6 +64,7 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 
 ## todo (in order)
 - see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
+- make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
 - improve color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
 - maybe a option to enable a dithering effect?? (both in color and in character seperately)

@@ -43,10 +43,6 @@ struct Args {
     #[arg(short, long, default_value_t = 0)]
     volume: u8,
 
-    /// Only affects videos, use this for taking your webcam or another stream as input
-    #[arg(short, long)]
-    stream: bool,
-
     /// make dark areas light, and light areas dark
     #[arg(long)]
     inverted: bool,
@@ -64,6 +60,22 @@ struct Args {
     /// the width and height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
     #[arg(long, default_value_t = 18)]
     char_height: u32,
+
+    /// Characters used for result
+    #[arg(long, default_value_t, value_enum)]
+    mode: Modes,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
+enum Modes {
+    #[default]
+    /// try image and video if image fails
+    Try,
+    Image,
+    /// requires ffmpeg
+    Video,
+    /// just like video but for thing like your webcam
+    Stream,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
@@ -71,9 +83,6 @@ enum ColorSet {
     #[default]
     None,
     All,
-    // ColorFull,
-    // FewColors,
-    // Real,
 }
 
 // The actual arrays of characters used for the character sets could be stored inside this enum, but i dont think it really matters
@@ -104,33 +113,47 @@ fn main() {
     // TODO rework video, image and stream into seperate modes
     // also make sure .gif falls into video, not image
 
-    // TRY IMAGE =====
-    do_image_stuff(&args);
+    let result: Result<(), String> = match &args.mode {
+        Modes::Try => try_them_all(&args),
+        Modes::Image => do_image_stuff(&args),
+        Modes::Video | Modes::Stream => do_video_stuff(&args),
+    };
 
-    // TRY VIDEO =====
-    eprintln!("Trying to open as a video");
-    do_video_stuff(&args);
+    eprintln!("{:?}", result);
+
+    // TODO error code exit if error
 }
 
-fn do_image_stuff(args: &Args) {
-    // TRY IMAGE =====
+fn try_them_all(args: &Args) -> Result<(), String> {
+    let image_result = do_image_stuff(args);
+
+    // TODO only do this if error is "cannot open as image", maybe i should do errors as enums
+    if image_result.is_err() {
+        // we could do a message here that we are trying video instead, but you wont have time to read it anyways
+        return do_video_stuff(args);
+    } else {
+        return image_result;
+    }
+}
+
+fn do_image_stuff(args: &Args) -> Result<(), String> {
     let reader_result = Reader::open(&args.path);
     if reader_result.is_err() {
-        eprintln!("Cannot find file");
-        return;
+        return Err("Cannot find file".to_string());
     }
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
         let mut thing = Textifier::new(&args);
         println!("{}", thing.to_text(image));
-        return;
+        return Ok(());
     } else {
-        eprintln!("Cannot open as an image");
+        return Err("Cannot open as an image".to_string());
+        // eprintln!();
     }
 }
 
-fn do_video_stuff(args: &Args) {
+fn do_video_stuff(args: &Args) -> Result<(), String> {
     let mut textifier = Textifier::new(&args);
     crossterm::execute!(io::stdout(), EnterAlternateScreen);
 
@@ -146,6 +169,7 @@ fn do_video_stuff(args: &Args) {
     }
 
     crossterm::execute!(io::stdout(), LeaveAlternateScreen);
+    return Ok(());
 }
 
 // NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
@@ -159,7 +183,7 @@ struct VideoFrameGrabber<'a> {
 impl<'b> VideoFrameGrabber<'b> {
     fn new<'a>(path: &PathBuf, args: &'a Args) -> Result<VideoFrameGrabber<'a>, String> {
         let length: f32;
-        if !args.stream {
+        if args.mode != Modes::Stream {
             let command_result = Command::new("ffprobe")
                 .args(["-i", path.to_str().unwrap()])
                 .args(["-show_entries", "format=duration"])
@@ -176,7 +200,7 @@ impl<'b> VideoFrameGrabber<'b> {
             }
 
             let output = String::from_utf8(command_result.unwrap().stdout).unwrap();
-            if let Ok(number) = output.replace("\n", "").parse::<f32>() {
+            if let Ok(number) = output.replace("\n", "").replace("\r", "").parse::<f32>() {
                 length = number;
             } else {
                 return Err(format!(
@@ -214,7 +238,7 @@ impl<'b> VideoFrameGrabber<'b> {
             return Err("out of video".to_string());
         }
         let command_result: io::Result<Output>;
-        if self.args.stream {
+        if self.args.mode == Modes::Stream {
             command_result = Command::new("ffmpeg")
                 .arg("-y")
                 .args(["-i", path.to_str().unwrap()])
@@ -239,7 +263,6 @@ impl<'b> VideoFrameGrabber<'b> {
         if command_result.is_ok() {
             let reader_result = Reader::open(&self.intermediate_output);
             if reader_result.is_err() {
-                eprintln!("Cannot find file");
                 return Err("Cannot find file".to_string());
             }
             let image = reader_result.unwrap().decode().unwrap();

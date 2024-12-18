@@ -71,7 +71,8 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // TODO another 'larger kernel' edge detection to make edges thinner
     // should also maybe be per color
     // dont even understand why the edges are thick right now
-    
+
+    // TODO check if this even has any effect :(    
     // we do sobel for every color, so for example the edge between a green and red area are very visible, and not only between white and black
     // maybe all of this sobel stuff needs to be adjusted for color space now?
 
@@ -182,12 +183,11 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
         }
     }
     
-    // 1/50th of pixels in a square
-    let partOfPixels: u32 = ((outsideXR - outsideXL) + (outsideYR - outsideYL)) / 50;
+    // 1/25th of pixels in a square
+    let partOfPixels: u32 = ((outsideXR - outsideXL) + (outsideYR - outsideYL)) / 25;
 
     var maxIndex: u32 = 0;
-    // var maxCount: u32 = partOfPixels; // this is the doorstep, if there are more than this amount of edge pixels it will be an edge
-    var maxCount: u32 = 0;
+    var maxCount: u32 = partOfPixels; // this is the doorstep, if there are more than this amount of edge pixels it will be an edge
     for (var i: u32 = 1; i < 5; i++) {
         if (counts[i] > maxCount) {
             maxIndex = i;
