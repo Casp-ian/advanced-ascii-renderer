@@ -33,43 +33,19 @@ struct Rotation {
 // 3: -
 // 4: \
 
+// x
+// <
+// >
+// (
+// )
+// ^
+// O
+// v
+
 struct PixelData {
     direction: u32,
     color: u32,
     brightness: f32,
-}
-
-// TODO apparently it is recomended to do gaussian blur in 2 different passes
-// https://www.w3.org/Talks/2012/0125-HTML-Tehran/Gaussian.xhtml
-
-// Compute Gaussian weight
-fn gaussianWeight(x: f32, sigma: f32) -> f32 {
-    let coeff = 1.0 / (sqrt(2.0 * PI) * sigma);
-    let exponent = -((x * x) / (2.0 * sigma * sigma));
-    return coeff * exp(exponent);
-}
-
-fn doGaussian(center: vec2<u32>, sigma: f32) -> f32 {
-    // TODO
-    var sumWeight: f32 = 0.0;
-    var sumX: f32 = 0.0;
-    var sumY: f32 = 0.0;
-    for (var x: i32 = -2; x <= 2; x++) {
-        for (var y: i32 = -2; y <= 2; y++) {
-            let sample = average( unpack4x8unorm( inputTexture[coordsInput(center.x - u32(x), center.y - u32(y))] ).rgb );
-
-            let weightX: f32 = gaussianWeight(f32(x), sigma);
-            let weightY: f32 = gaussianWeight(f32(y), sigma);
-
-            sumX += sample * weightX;
-            sumY += sample * weightY;
-
-            sumWeight += weightX;
-            
-        }
-    }
-
-    return ((sumX / sumWeight) + (sumY / sumWeight)) / 2;
 }
 
 fn coordsInput(x: u32, y: u32) -> u32 {
@@ -92,32 +68,69 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    // DoG
+    // we do sobel for every color, so for example the edge between a green and red area are very visible, and not only between white and black
+    // maybe all of this sobel stuff needs to be adjusted for color space now?
 
-    let DoG = doGaussian(global_id.xy, 3.0) - doGaussian(global_id.xy, 1.0);
+    // Sobel
+    let gxrgb = (
+          1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb
+        + 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 0)] ).rgb
+        + 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb
+        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb
+        - 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 0)] ).rgb
+        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb
+    ) / 8;
+    let gyrgb = (
+          1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb
+        + 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y - 1)] ).rgb
+        + 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb
+        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb
+        - 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y + 1)] ).rgb
+        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb
+    ) / 8;
 
-    if (DoG <= 0.03) {
+    // magnitudes for every color channel
+    let ar = sqrt(pow(gxrgb.r, 2.0) + pow(gyrgb.r, 2.0));
+    let ag = sqrt(pow(gxrgb.g, 2.0) + pow(gyrgb.g, 2.0));
+    let ab = sqrt(pow(gxrgb.b, 2.0) + pow(gyrgb.b, 2.0));
+
+    var gx: f32 = 0.0;
+    var gy: f32 = 0.0;
+
+    // TODO rename magnitude threshold
+    let al = 0.15;
+    if (ar > al && ag > al && ab > al) {
+        // average all
+        gx = (gxrgb.r + gxrgb.g + gxrgb.g) / 3;
+        gy = (gyrgb.r + gyrgb.g + gyrgb.g) / 3;
+    } else if (ar > al && ag > al) {
+        // red green
+        gx = (gxrgb.r + gxrgb.g) / 2;
+        gy = (gyrgb.r + gyrgb.g) / 2;
+    } else if (ar > al && ab > al) {
+        // red blue
+        gx = (gxrgb.r + gxrgb.b) / 2;
+        gy = (gyrgb.r + gyrgb.b) / 2;
+    } else if (ag > al && ab > al) {
+        // red green
+        gx = (gxrgb.g + gxrgb.b) / 2;
+        gy = (gyrgb.g + gyrgb.b) / 2;
+    } else if (ar > al) {
+        // red
+        gx = gxrgb.r;
+        gy = gyrgb.r;
+    } else if (ag > al) {
+        // green
+        gx = gxrgb.g;
+        gy = gyrgb.g;
+    } else if (ab > al) {
+        // blue
+        gx = gxrgb.b;
+        gy = gyrgb.b;
+    } else {
         intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(0); // none
         return;
     }
-
-    // Sobel
-    let gx = (
-          1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb )
-        + 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 0)] ).rgb )
-        + 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb )
-        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb )
-        - 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 0)] ).rgb )
-        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb )
-    ) / 8;
-    let gy = (
-          1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb )
-        + 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y - 1)] ).rgb )
-        + 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb )
-        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb )
-        - 2 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y + 1)] ).rgb )
-        - 1 * average( unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb )
-    ) / 8;
 
     let dir = atan2(gy, gx);
     // grab a picture of a unit circle to make sense of this next part
@@ -165,9 +178,12 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
         }
     }
     
+    // 1/50th of pixels in a square
+    let partOfPixels: u32 = ((outsideXR - outsideXL) + (outsideYR - outsideYL)) / 50;
 
     var maxIndex: u32 = 0;
-    var maxCount: u32 = 2; // this is the floor, if there are more than this amount of edge pixels it will be an edge
+    // var maxCount: u32 = partOfPixels; // this is the doorstep, if there are more than this amount of edge pixels it will be an edge
+    var maxCount: u32 = 0;
     for (var i: u32 = 1; i < 5; i++) {
         if (counts[i] > maxCount) {
             maxIndex = i;
