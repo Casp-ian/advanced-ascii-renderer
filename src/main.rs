@@ -99,10 +99,11 @@ enum CharSet {
 const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
 
 fn do_before_exit() {
-    let _ = Command::new("rm").arg(TEMPORARY_IMAGE_FILE_NAME).output();
-    // functionality sometimes still continues, and i dont know why, even if we cant clean up after the user presses ctrl c
-    // TODO use this to make sure everything exits
-    crossterm::execute!(io::stdout(), LeaveAlternateScreen);
+    let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
+    let _ = crossterm::execute!(io::stdout(), LeaveAlternateScreen);
+
+    // TODO, this doesnt stop any of the other processes in a neat way, so sometimes a error message gets shown at exit
+    std::process::exit(0);
 }
 
 fn main() {
@@ -110,22 +111,20 @@ fn main() {
 
     let _ = ctrlc::set_handler(do_before_exit);
 
-    // TODO rework video, image and stream into seperate modes
-    // also make sure .gif falls into video, not image
-
     let result: Result<(), String> = match &args.mode {
         Modes::Try => try_them_all(&args),
         Modes::Image => do_image_stuff(&args),
         Modes::Video | Modes::Stream => do_video_stuff(&args),
     };
 
-    eprintln!("{:?}", result);
+    // eprintln!("{:?}", result);
 
     // TODO error code exit if error
 }
 
 fn try_them_all(args: &Args) -> Result<(), String> {
     let image_result = do_image_stuff(args);
+    // TODO make sure .gif and other multiuse formats falls into video first then image
 
     // TODO only do this if error is "cannot open as image", maybe i should do errors as enums
     if image_result.is_err() {
@@ -178,7 +177,6 @@ struct VideoFrameGrabber<'a> {
     args: &'a Args,
     start_time: Instant,
     length: f32,
-    intermediate_output: String,
 }
 impl<'b> VideoFrameGrabber<'b> {
     fn new<'a>(path: &PathBuf, args: &'a Args) -> Result<VideoFrameGrabber<'a>, String> {
@@ -229,7 +227,6 @@ impl<'b> VideoFrameGrabber<'b> {
             args,
             start_time,
             length,
-            intermediate_output: TEMPORARY_IMAGE_FILE_NAME.to_string(),
         });
     }
 
@@ -244,7 +241,7 @@ impl<'b> VideoFrameGrabber<'b> {
                 .args(["-i", path.to_str().unwrap()])
                 .args(["-q:v", &self.args.quality.to_string()])
                 .args(["-frames:v", "1"])
-                .arg(&self.intermediate_output)
+                .arg(TEMPORARY_IMAGE_FILE_NAME)
                 .output();
         } else {
             command_result = Command::new("ffmpeg")
@@ -256,17 +253,17 @@ impl<'b> VideoFrameGrabber<'b> {
                 .args(["-i", path.to_str().unwrap()])
                 .args(["-q:v", &self.args.quality.to_string()])
                 .args(["-frames:v", "1"])
-                .arg(&self.intermediate_output)
+                .arg(TEMPORARY_IMAGE_FILE_NAME)
                 .output();
         }
 
         if command_result.is_ok() {
-            let reader_result = Reader::open(&self.intermediate_output);
+            let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
             if reader_result.is_err() {
                 return Err("Cannot find file".to_string());
             }
             let image = reader_result.unwrap().decode().unwrap();
-            let _ = Command::new("rm").arg(&self.intermediate_output).output();
+            let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
             return Ok(image);
         }
         return Err("fuck you".to_string());
