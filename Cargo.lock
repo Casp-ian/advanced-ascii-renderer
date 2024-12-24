@@ -221,6 +221,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
+name = "climage"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "clap",
+ "crossterm",
+ "ctrlc",
+ "flume",
+ "image",
+ "pollster",
+ "wgpu",
+]
+
+[[package]]
 name = "codespan-reporting"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -620,20 +634,6 @@ dependencies = [
  "png",
  "qoi",
  "tiff",
-]
-
-[[package]]
-name = "imageToText"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "clap",
- "crossterm",
- "ctrlc",
- "flume",
- "image",
- "pollster",
- "wgpu",
 ]
 
 [[package]]
