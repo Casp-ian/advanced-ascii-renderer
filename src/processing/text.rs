@@ -32,13 +32,15 @@ pub fn translate_to_text(
 
     // TODO also not really pixels
     // iterate over pixel data
-    for row in data {
+    for (i, row) in data.iter().enumerate() {
+        if i != 0 {
+            result += "\n";
+        }
         for data in row {
             result += get_ansi_color_code(&color, data.color.0).as_str();
 
             result += get_char(&set, data, inverted, no_lines).as_str();
         }
-        result += "\n";
     }
 
     return result;
@@ -55,7 +57,7 @@ pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 3]) -> String {
     }
 }
 
-pub fn get_char(char_set: &CharSet, pixel: PixelData, inverted: bool, no_lines: bool) -> String {
+pub fn get_char(char_set: &CharSet, pixel: &PixelData, inverted: bool, no_lines: bool) -> String {
     if !no_lines {
         match pixel.direction {
             Direction::TopToBottom => return "|".to_string(),

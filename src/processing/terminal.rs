@@ -52,7 +52,7 @@ pub fn get_fitting_terminal(
 
     if let Ok(size) = terminal::size() {
         max_terminal_chars_x = size.0 as u32;
-        max_terminal_chars_y = size.1 as u32 - 3; // minus 3 to adjust for prompt size, maybe we can actually get that prompt height somehow, but well try later
+        max_terminal_chars_y = size.1 as u32;
     } else {
         max_terminal_chars_x = 200;
         max_terminal_chars_y = 50;

@@ -5,12 +5,10 @@ use std::{fmt::Debug, time::Instant};
 use clap::{Parser, ValueEnum};
 use image::{io::Reader, DynamicImage};
 
-use crossterm::terminal::{self, Clear, EnterAlternateScreen, LeaveAlternateScreen};
-
 mod processing;
 use processing::image::*;
 
-use std::process::{Command, ExitStatus, Output};
+use std::process::{Command, ExitCode, Output};
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
@@ -104,13 +102,12 @@ const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
 
 fn do_before_exit() {
     let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
-    let _ = crossterm::execute!(io::stdout(), LeaveAlternateScreen);
 
     // TODO, this doesnt stop any of the other processes in a neat way, so sometimes a error message gets shown at exit
     std::process::exit(0);
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args = Args::parse();
 
     let _ = ctrlc::set_handler(do_before_exit);
@@ -121,16 +118,23 @@ fn main() {
         Modes::Video | Modes::Stream => do_video_stuff(&args),
     };
 
-    // eprintln!("{:?}", result);
-
-    // TODO error code exit if error
+    match result {
+        Ok(_) => {
+            return ExitCode::SUCCESS;
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::SUCCESS;
+        }
+    }
 }
 
 fn try_them_all(args: &Args) -> Result<(), String> {
     let image_result = do_image_stuff(args);
     // TODO make sure .gif and other multiuse formats falls into video first then image
+    // webm is weird too?
 
-    // TODO only do this if error is "cannot open as image", maybe i should do errors as enums
+    // TODO only do this if error is "cannot open as image", I should do errors as enums
     if image_result.is_err() {
         // we could do a message here that we are trying video instead, but you wont have time to read it anyways
         return do_video_stuff(args);
@@ -148,7 +152,11 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
 
     if let Ok(image) = img_result {
         let mut thing = Textifier::new(&args);
-        println!("{}", thing.to_text(image));
+        print!("{}", thing.to_text(image));
+
+        // clear ansii color code
+        println!("\x1b[0m");
+
         return Ok(());
     } else {
         return Err("Cannot open as an image".to_string());
@@ -158,21 +166,26 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
 
 fn do_video_stuff(args: &Args) -> Result<(), String> {
     let mut textifier = Textifier::new(&args);
-    crossterm::execute!(io::stdout(), EnterAlternateScreen);
 
     let video_textifier = VideoFrameGrabber::new(&args.path, args).unwrap();
     loop {
-        if let Ok(image) = video_textifier.get_frame_as_image(&args.path) {
-            let result = textifier.to_text(image);
-            crossterm::execute!(io::stdout(), Clear(terminal::ClearType::All));
-            println!("{}", result);
-        } else {
-            break;
+        match video_textifier.get_frame_as_image(&args.path) {
+            Ok(image) => {
+                // these are ansii codes for 'clear current screen (dont clear scrollback)', and 'move cursor to top left'
+                let ansii = "\x1b[2J\x1b[0;0H";
+                let result = textifier.to_text(image);
+                print!("{}{}", ansii, result);
+            }
+            Err(e) => {
+                // TODO if error of 'out of frames' then return Ok()
+
+                // new line because we might still be on another line
+                // also clear ansii color code
+                eprintln!("\x1b[0m");
+                return Err(e);
+            }
         }
     }
-
-    crossterm::execute!(io::stdout(), LeaveAlternateScreen);
-    return Ok(());
 }
 
 // NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
@@ -265,9 +278,9 @@ impl<'b> VideoFrameGrabber<'b> {
         match command_result {
             Err(e) => return Err(e.to_string()),
             Ok(s) => {
-                if ExitStatus::success(&s.status) {
-                    return Err("ffmpeg status code not 0".to_string()); // TODO actual output
-                }
+                // if s.status.code().unwrap_or(1) == 0 {
+                //     return Err("ffmpeg status code not 0".to_string());
+                // }
                 let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
                 if let Err(e) = reader_result {
                     return Err(e.to_string());
