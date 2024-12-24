@@ -10,7 +10,7 @@ use crossterm::terminal::{self, Clear, EnterAlternateScreen, LeaveAlternateScree
 mod processing;
 use processing::image::*;
 
-use std::process::{Command, Output};
+use std::process::{Command, ExitStatus, Output};
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
@@ -42,6 +42,10 @@ struct Args {
     /// Only affects videos, sets audio volume, clamps to 100
     #[arg(short, long, default_value_t = 0)]
     volume: u8,
+
+    /// Only affects videos, sets ffmpeg format if ffmpeg cant auto detect
+    #[arg(short, long)]
+    format: Option<String>,
 
     /// make dark areas light, and light areas dark
     #[arg(long)]
@@ -235,37 +239,43 @@ impl<'b> VideoFrameGrabber<'b> {
             return Err("out of video".to_string());
         }
         let command_result: io::Result<Output>;
-        if self.args.mode == Modes::Stream {
-            command_result = Command::new("ffmpeg")
-                .arg("-y")
-                .args(["-i", path.to_str().unwrap()])
-                .args(["-q:v", &self.args.quality.to_string()])
-                .args(["-frames:v", "1"])
-                .arg(TEMPORARY_IMAGE_FILE_NAME)
-                .output();
-        } else {
-            command_result = Command::new("ffmpeg")
-                .arg("-y")
-                .args([
-                    "-ss",
-                    self.start_time.elapsed().as_secs_f32().to_string().as_str(),
-                ])
-                .args(["-i", path.to_str().unwrap()])
-                .args(["-q:v", &self.args.quality.to_string()])
-                .args(["-frames:v", "1"])
-                .arg(TEMPORARY_IMAGE_FILE_NAME)
-                .output();
+
+        let mut command = &mut Command::new("ffmpeg");
+        command = command.arg("-y");
+
+        if let Some(format) = &self.args.format {
+            command = command.args(["-f", format.as_str()]);
         }
 
-        if command_result.is_ok() {
-            let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
-            if reader_result.is_err() {
-                return Err("Cannot find file".to_string());
-            }
-            let image = reader_result.unwrap().decode().unwrap();
-            let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
-            return Ok(image);
+        if self.args.mode != Modes::Stream {
+            command = command.args([
+                "-ss",
+                self.start_time.elapsed().as_secs_f32().to_string().as_str(),
+            ]);
         }
-        return Err("fuck you".to_string());
+
+        command = command
+            .args(["-i", path.to_str().unwrap()])
+            .args(["-q:v", &self.args.quality.to_string()])
+            .args(["-frames:v", "1"])
+            .arg(TEMPORARY_IMAGE_FILE_NAME);
+
+        command_result = command.output();
+
+        match command_result {
+            Err(e) => return Err(e.to_string()),
+            Ok(s) => {
+                if ExitStatus::success(&s.status) {
+                    return Err("ffmpeg status code not 0".to_string()); // TODO actual output
+                }
+                let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
+                if let Err(e) = reader_result {
+                    return Err(e.to_string());
+                }
+                let image = reader_result.unwrap().decode().unwrap();
+                let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
+                return Ok(image);
+            }
+        }
     }
 }

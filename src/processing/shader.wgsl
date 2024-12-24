@@ -103,7 +103,7 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var gy: f32 = 0.0;
 
     // TODO rename magnitude threshold
-    let al = 0.15;
+    let al = 0.05;
     if (ar > al && ag > al && ab > al) {
         // average all
         gx = (gxrgb.r + gxrgb.g + gxrgb.g) / 3;
@@ -175,30 +175,34 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let outsideYL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
     let outsideXR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
     let outsideYR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
+    let outsideXC = (outsideXL + outsideXR) / 2;
+    let outsideYC = (outsideYL + outsideYR) / 2;
 
-    var counts = array<u32, 5>(0, 0, 0, 0, 0);
-    for (var i: u32 = outsideXL; i <= outsideXR; i++) {
-        for (var j: u32 = outsideYL; j <= outsideYR; j++) {
-            counts[intermediateBuffer[coordsInput(i, j)].direction]++;
-        }
-    }
+    // var counts = array<u32, 5>(0, 0, 0, 0, 0);
+    // for (var i: u32 = outsideXL; i <= outsideXR; i++) {
+    //     for (var j: u32 = outsideYL; j <= outsideYR; j++) {
+    //         counts[intermediateBuffer[coordsInput(i, j)].direction]++;
+    //     }
+    // }
     
-    // 1/25th of pixels in a square
-    let partOfPixels: u32 = ((outsideXR - outsideXL) + (outsideYR - outsideYL)) / 25;
+    // // 1/25th of pixels in a square
+    // let partOfPixels: u32 = ((outsideXR - outsideXL) + (outsideYR - outsideYL)) / 25;
 
-    var maxIndex: u32 = 0;
-    var maxCount: u32 = partOfPixels; // this is the doorstep, if there are more than this amount of edge pixels it will be an edge
-    for (var i: u32 = 1; i < 5; i++) {
-        if (counts[i] > maxCount) {
-            maxIndex = i;
-            maxCount = counts[i];
-        }
-    }
+    // var maxIndex: u32 = 0;
+    // var maxCount: u32 = partOfPixels; // this is the doorstep, if there are more than this amount of edge pixels it will be an edge
+    // for (var i: u32 = 1; i < 5; i++) {
+    //     if (counts[i] > maxCount) {
+    //         maxIndex = i;
+    //         maxCount = counts[i];
+    //     }
+    // }
     
-    let direction = maxIndex;
+    // let direction = maxIndex;
+
+    let direction = intermediateBuffer[coordsInput(outsideXC, outsideYC)].direction;
 
     // TODO get center pixel or some other downscaling method
-    let packedColorPixel = inputTexture[coordsInput(outsideXL, outsideYL)];
+    let packedColorPixel = inputTexture[coordsInput(outsideXC, outsideYC)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
     // TODO grab more surrounding pixels to scale down better
     // especialy the angles
