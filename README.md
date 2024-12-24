@@ -1,6 +1,5 @@
-# ImageToText
-
-This is a simple command line tool that will turn an image into text.
+# CLImage
+This is a command line image and video tool that will turn an image into text, with edge detection as an unique feature.
 
 Usecases could include:
 - Needing to get an idea of what an image contains when in an enviorment where you only have the terminal like when you are ssh'd into a machine.
