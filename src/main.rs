@@ -157,7 +157,7 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
         let mut thing = Textifier::new(&args);
         print!("{}", thing.to_text(image));
 
-        // clear ansii color code
+        // clear ansi color code
         println!("\x1b[0m");
 
         return Ok(());
@@ -174,16 +174,16 @@ fn do_video_stuff(args: &Args) -> Result<(), String> {
     while let Some(image_result) = video_frame_grabber.grab() {
         match image_result {
             Ok(image) => {
-                // these are ansii codes for 'clear current screen (dont clear scrollback)', and 'move cursor to top left'
-                let ansii = "\x1b[2J\x1b[0;0H";
+                // these are ansi codes for 'clear current screen (dont clear scrollback)', and 'move cursor to top left'
+                let ansi = "\x1b[2J\x1b[0;0H";
                 let result = textifier.to_text(image);
-                print!("{}{}", ansii, result);
+                print!("{}{}", ansi, result);
             }
             Err(e) => {
                 // TODO if error of 'out of frames' then return Ok()
 
                 // new line because we might still be on another line
-                // also clear ansii color code
+                // also clear ansi color code
                 eprintln!("\x1b[0m");
                 return Err(e);
             }
