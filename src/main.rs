@@ -1,3 +1,4 @@
+use std::fs::remove_file;
 use std::io;
 use std::path::PathBuf;
 use std::{fmt::Debug, time::Instant};
@@ -101,7 +102,7 @@ enum CharSet {
 const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
 
 fn do_before_exit() {
-    let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
+    let _ = remove_file(TEMPORARY_IMAGE_FILE_NAME);
 
     // TODO, this doesnt stop any of the other processes in a neat way, so sometimes a error message gets shown at exit
     std::process::exit(0);
@@ -124,7 +125,7 @@ fn main() -> ExitCode {
         }
         Err(e) => {
             eprintln!("{}", e);
-            return ExitCode::SUCCESS;
+            return ExitCode::FAILURE;
         }
     }
 }
@@ -136,7 +137,7 @@ fn try_them_all(args: &Args) -> Result<(), String> {
 
     // TODO only do this if error is "cannot open as image", I should do errors as enums
     if image_result.is_err() {
-        // we could do a message here that we are trying video instead, but you wont have time to read it anyways
+        eprintln!("Can not open as image, now trying to open as video");
         return do_video_stuff(args);
     } else {
         return image_result;
@@ -160,7 +161,6 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
         return Ok(());
     } else {
         return Err("Cannot open as an image".to_string());
-        // eprintln!();
     }
 }
 
@@ -248,9 +248,9 @@ impl<'b> VideoFrameGrabber<'b> {
     }
 
     fn get_frame_as_image(&self, path: &PathBuf) -> Result<DynamicImage, String> {
-        if self.length < self.start_time.elapsed().as_secs_f32() {
-            return Err("out of video".to_string());
-        }
+        // if self.length < self.start_time.elapsed().as_secs_f32() {
+        //     return Err("out of video".to_string());
+        // }
         let command_result: io::Result<Output>;
 
         let mut command = &mut Command::new("ffmpeg");
@@ -278,15 +278,16 @@ impl<'b> VideoFrameGrabber<'b> {
         match command_result {
             Err(e) => return Err(e.to_string()),
             Ok(s) => {
-                // if s.status.code().unwrap_or(1) == 0 {
-                //     return Err("ffmpeg status code not 0".to_string());
-                // }
                 let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
                 if let Err(e) = reader_result {
+                    if e.kind() == io::ErrorKind::NotFound {
+                        // in this case there will be no more in stream
+                        return Err(e.to_string());
+                    }
                     return Err(e.to_string());
                 }
                 let image = reader_result.unwrap().decode().unwrap();
-                let _ = std::fs::remove_file(TEMPORARY_IMAGE_FILE_NAME);
+                let _ = remove_file(TEMPORARY_IMAGE_FILE_NAME);
                 return Ok(image);
             }
         }
