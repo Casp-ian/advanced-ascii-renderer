@@ -2,6 +2,7 @@
 (abbreviated as 'aar')
 
 This is a command line tool that will turn an image or video into ascii or other text.
+
 With edge detection and gpu acceleration as "advanced" features.
 
 Usecases could include:
