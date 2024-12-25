@@ -1,5 +1,8 @@
-# CLImage
-This is a command line image and video tool that will turn an image into text, with edge detection as an unique feature.
+# Advanced Ascii Renderer
+(abbreviated as 'aar')
+
+This is a command line tool that will turn an image or video into ascii or other text.
+With edge detection and gpu acceleration as "advanced" features.
 
 Usecases could include:
 - Needing to get an idea of what an image contains when in an enviorment where you only have the terminal like when you are ssh'd into a machine.
