@@ -1,15 +1,15 @@
-use std::fs::remove_file;
-use std::io;
-use std::path::PathBuf;
-use std::{fmt::Debug, time::Instant};
-
 use clap::{Parser, ValueEnum};
-use image::{io::Reader, DynamicImage};
+use image::io::Reader;
+use std::fmt::Debug;
+use std::fs::remove_file;
+use std::process::ExitCode;
 
-mod processing;
-use processing::image::*;
+mod video;
 
-use std::process::{Command, ExitCode, Output};
+mod terminal;
+
+mod textifier;
+use textifier::Textifier;
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
@@ -56,11 +56,11 @@ struct Args {
 
     // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
     // i do not know how to get these, so for now we have hardcoded defaults
-    /// the width and height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
+    /// the width of a character in pixels, only use if the defaults dont suit your needs or dont match your font
     #[arg(long, default_value_t = 10)]
     char_width: u32,
 
-    /// the width and height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
+    /// the height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
     #[arg(long, default_value_t = 18)]
     char_height: u32,
 
@@ -72,12 +72,12 @@ struct Args {
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
 enum Modes {
     #[default]
-    /// try image and video if image fails
+    /// try image and then video if image fails
     Try,
     Image,
-    /// requires ffmpeg
+    /// textify frames as fast as it can, requires ffmpeg
     Video,
-    /// just like video but for thing like your webcam
+    /// just like video but for things like your webcam
     Stream,
 }
 
@@ -99,10 +99,8 @@ enum CharSet {
     Discord,
 }
 
-const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
-
 fn do_before_exit() {
-    let _ = remove_file(TEMPORARY_IMAGE_FILE_NAME);
+    let _ = remove_file(video::TEMPORARY_IMAGE_FILE_NAME);
 
     // TODO, this doesnt stop any of the other processes in a neat way, so sometimes a error message gets shown at exit
     std::process::exit(0);
@@ -133,7 +131,11 @@ fn main() -> ExitCode {
 fn try_them_all(args: &Args) -> Result<(), String> {
     let image_result = do_image_stuff(args);
     // TODO make sure .gif and other multiuse formats falls into video first then image
-    // webm is weird too?
+
+    // list of non working formats
+    // webp (video) - ffmpeg doesnt support (image works fine)
+    // avif - rust image doesnt support
+    // gif - should prioritise video not image
 
     // TODO only do this if error is "cannot open as image", I should do errors as enums
     if image_result.is_err() {
@@ -167,9 +169,10 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
 fn do_video_stuff(args: &Args) -> Result<(), String> {
     let mut textifier = Textifier::new(&args);
 
-    let video_textifier = VideoFrameGrabber::new(&args.path, args).unwrap();
-    loop {
-        match video_textifier.get_frame_as_image(&args.path) {
+    let video_frame_grabber = video::FrameGrabber::new(&args.path, args).unwrap();
+
+    while let Some(image_result) = video_frame_grabber.grab() {
+        match image_result {
             Ok(image) => {
                 // these are ansii codes for 'clear current screen (dont clear scrollback)', and 'move cursor to top left'
                 let ansii = "\x1b[2J\x1b[0;0H";
@@ -186,110 +189,5 @@ fn do_video_stuff(args: &Args) -> Result<(), String> {
             }
         }
     }
-}
-
-// NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
-// so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now, and can be changed later
-struct VideoFrameGrabber<'a> {
-    args: &'a Args,
-    start_time: Instant,
-    length: f32,
-}
-impl<'b> VideoFrameGrabber<'b> {
-    fn new<'a>(path: &PathBuf, args: &'a Args) -> Result<VideoFrameGrabber<'a>, String> {
-        let length: f32;
-        if args.mode != Modes::Stream {
-            let command_result = Command::new("ffprobe")
-                .args(["-i", path.to_str().unwrap()])
-                .args(["-show_entries", "format=duration"])
-                .args(["-v", "quiet"])
-                .args(["-of", "default=noprint_wrappers=1:nokey=1"])
-                .output();
-
-            if let Err(error) = command_result {
-                eprintln!(
-                    "probably couldnt find ffmprobe (often installed with ffmpeg) on your system"
-                );
-                // eprintln!("{}", error);
-                return Err(error.to_string());
-            }
-
-            let output = String::from_utf8(command_result.unwrap().stdout).unwrap();
-            if let Ok(number) = output.replace("\n", "").replace("\r", "").parse::<f32>() {
-                length = number;
-            } else {
-                return Err(format!(
-                    "Could not get video length instead got: {}",
-                    output
-                ));
-            }
-        } else {
-            length = f32::MAX; // still need to set length, but this wont be checked
-        }
-
-        if args.volume > 0 {
-            Command::new("ffplay")
-                .args([path.to_str().unwrap()])
-                .args(["-nodisp"])
-                .args(["-autoexit"])
-                .args(["-v", "quiet"])
-                .args(["-volume", &args.volume.to_string()])
-                .spawn()
-                .expect("audio broke");
-        }
-
-        let start_time = Instant::now();
-
-        return Ok(VideoFrameGrabber {
-            args,
-            start_time,
-            length,
-        });
-    }
-
-    fn get_frame_as_image(&self, path: &PathBuf) -> Result<DynamicImage, String> {
-        // if self.length < self.start_time.elapsed().as_secs_f32() {
-        //     return Err("out of video".to_string());
-        // }
-        let command_result: io::Result<Output>;
-
-        let mut command = &mut Command::new("ffmpeg");
-        command = command.arg("-y");
-
-        if let Some(format) = &self.args.format {
-            command = command.args(["-f", format.as_str()]);
-        }
-
-        if self.args.mode != Modes::Stream {
-            command = command.args([
-                "-ss",
-                self.start_time.elapsed().as_secs_f32().to_string().as_str(),
-            ]);
-        }
-
-        command = command
-            .args(["-i", path.to_str().unwrap()])
-            .args(["-q:v", &self.args.quality.to_string()])
-            .args(["-frames:v", "1"])
-            .arg(TEMPORARY_IMAGE_FILE_NAME);
-
-        command_result = command.output();
-
-        match command_result {
-            Err(e) => return Err(e.to_string()),
-            Ok(s) => {
-                let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
-                if let Err(e) = reader_result {
-                    if e.kind() == io::ErrorKind::NotFound {
-                        // in this case there will be no more in stream
-                        return Err(e.to_string());
-                    }
-                    return Err(e.to_string());
-                }
-                let image = reader_result.unwrap().decode().unwrap();
-                let _ = remove_file(TEMPORARY_IMAGE_FILE_NAME);
-                return Ok(image);
-            }
-        }
-    }
+    return Ok(());
 }

@@ -1,8 +1,7 @@
-use crate::processing::image::PixelData;
+use super::types::*;
 
 use crate::CharSet;
 use crate::ColorSet;
-use crate::Direction;
 
 const BLACK: &str = "\x1b[30m";
 const RED: &str = "\x1b[31m";
