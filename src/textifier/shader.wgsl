@@ -209,8 +209,8 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
 
     // TODO alpha influence?
-    // let brightness = (colorPixel.r * 0.2126) + (colorPixel.g * 0.7152) + (colorPixel.b * 0.0722); 
-    let brightness = average(colorPixel.rgb); 
+    let brightness = (colorPixel.r * 0.2126) + (colorPixel.g * 0.7152) + (colorPixel.b * 0.0722); 
+    // let brightness = average(colorPixel.rgb); 
 
     outputBuffer[coordsOutput(global_id.x, global_id.y)] = PixelData(
         direction,

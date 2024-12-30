@@ -18,7 +18,8 @@ fn grab_video_frames(c: &mut Criterion) {
         no_lines: false, // doesnt matter for this test
         char_width: 0,   // doesnt matter for this test
         char_height: 0,  // doesnt matter for this test
-        mode: aar::cli::Modes::Video,
+        media_mode: aar::cli::MediaModes::Video,
+        processing_mode: aar::cli::ProcessingModes::Gpu,
     };
     let grabber = &FrameGrabber::new(&args).unwrap();
 
@@ -47,7 +48,8 @@ fn grab_device_frames(c: &mut Criterion) {
         no_lines: false, // doesnt matter for this test
         char_width: 0,   // doesnt matter for this test
         char_height: 0,  // doesnt matter for this test
-        mode: aar::cli::Modes::Stream,
+        media_mode: aar::cli::MediaModes::Stream,
+        processing_mode: aar::cli::ProcessingModes::Gpu,
     };
     let grabber = &FrameGrabber::new(&args).unwrap();
 

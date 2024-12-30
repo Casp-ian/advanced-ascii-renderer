@@ -6,7 +6,7 @@ use std::{
 
 use image::{io::Reader, DynamicImage};
 
-use crate::{Args, Modes};
+use crate::{Args, MediaModes};
 
 pub const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
 
@@ -44,7 +44,7 @@ impl<'b> FrameGrabber<'b> {
             command = command.args(["-f", format.as_str()]);
         }
 
-        if self.args.mode != Modes::Stream {
+        if self.args.media_mode != MediaModes::Stream {
             command = command.args([
                 "-ss",
                 self.start_time.elapsed().as_secs_f32().to_string().as_str(),

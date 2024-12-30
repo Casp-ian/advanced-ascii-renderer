@@ -252,7 +252,7 @@ impl WgpuContext {
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
-    ) -> Result<Vec<f32>, &str> {
+    ) -> Result<Vec<f32>, String> {
         // will get the image to process to the gpu
         self.queue
             .write_buffer(&self.input_buffer, 0, input_image.as_raw());
@@ -332,7 +332,7 @@ impl WgpuContext {
             // Returns data from buffer
             return Ok(result);
         } else {
-            return Err("cant run on gpu"); // TODO stupid message
+            return Err("cant run on gpu".to_string()); // TODO stupid message
         }
     }
 }

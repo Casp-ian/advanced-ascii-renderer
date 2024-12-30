@@ -11,10 +11,10 @@ pub mod textifier;
 use textifier::Textifier;
 
 pub fn run_with_args(args: &Args) -> Result<(), String> {
-    let result: Result<(), String> = match args.mode {
-        Modes::Try => try_them_all(args),
-        Modes::Image => do_image_stuff(args),
-        Modes::Video | Modes::Stream => do_video_stuff(args),
+    let result: Result<(), String> = match args.media_mode {
+        MediaModes::Try => try_them_all(args),
+        MediaModes::Image => do_image_stuff(args),
+        MediaModes::Video | MediaModes::Stream => do_video_stuff(args),
     };
     return result;
 }
@@ -46,7 +46,7 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
 
     if let Ok(image) = img_result {
         let mut thing = Textifier::new(&args);
-        print!("{}", thing.to_text(image));
+        print!("{}", thing.to_text(image)?);
 
         // clear ansi color code
         println!("\x1b[0m");
@@ -78,15 +78,15 @@ fn do_video_stuff(args: &Args) -> Result<(), String> {
                     ansi = "\x1b[2J\x1b[0;0H";
                 }
 
-                let result = textifier.to_text(image);
-                print!("{}{}", ansi, result);
+                let text = textifier.to_text(image)?;
+                print!("{}{}", ansi, text);
             }
             Err(e) => {
                 // TODO if error of 'out of frames' then return Ok()
 
                 // new line because we might still be on another line
                 // also clear ansi color code
-                eprintln!("\x1b[0m");
+                println!("\x1b[0m");
                 return Err(e);
             }
         }

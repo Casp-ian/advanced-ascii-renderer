@@ -54,13 +54,17 @@ pub struct Args {
     #[arg(long, default_value_t = 18)]
     pub char_height: u32,
 
-    /// Characters used for result
+    /// choose how to read the file
     #[arg(long, default_value_t, value_enum)]
-    pub mode: Modes,
+    pub media_mode: MediaModes,
+
+    /// choose wether to use gpu or cpu
+    #[arg(long, default_value_t, value_enum)]
+    pub processing_mode: ProcessingModes,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
-pub enum Modes {
+pub enum MediaModes {
     #[default]
     /// try image and then video if image fails
     Try,
@@ -69,6 +73,18 @@ pub enum Modes {
     Video,
     /// just like video but for things like your webcam
     Stream,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
+pub enum ProcessingModes {
+    #[default]
+    /// try gpu and then cpu simple if gpu fails
+    Try,
+    Gpu,
+    /// runs on cpu but with less features than gpu
+    CpuSimple,
+    /// runs on cpu but tries to look similar to gpu, might take a while
+    CpuFull,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
