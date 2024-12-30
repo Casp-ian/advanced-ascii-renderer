@@ -1,6 +1,5 @@
 use std::{
     fs::remove_file,
-    path::PathBuf,
     process::{Command, Output},
     time::Instant,
 };
@@ -18,10 +17,10 @@ pub struct FrameGrabber<'a> {
     start_time: Instant,
 }
 impl<'b> FrameGrabber<'b> {
-    pub fn new<'a>(path: &PathBuf, args: &'a Args) -> Result<FrameGrabber<'a>, String> {
+    pub fn new<'a>(args: &'a Args) -> Result<FrameGrabber<'a>, String> {
         if args.volume > 0 {
             Command::new("ffplay")
-                .args([path.to_str().unwrap()])
+                .args([args.path.to_str().unwrap()])
                 .args(["-nodisp"])
                 .args(["-autoexit"])
                 .args(["-v", "quiet"])
