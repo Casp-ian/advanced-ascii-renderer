@@ -164,13 +164,7 @@ impl<'b> Textifier<'b> {
             return Err(e.to_string());
         }
 
-        let result_string = translate_to_text(
-            data.unwrap(),
-            self.args.set,
-            self.args.color,
-            self.args.inverted,
-            self.args.no_lines,
-        );
+        let result_string = translate_to_text(self.args, data.unwrap());
 
         return Ok(result_string);
     }

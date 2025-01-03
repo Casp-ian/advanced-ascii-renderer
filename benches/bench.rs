@@ -14,10 +14,11 @@ fn grab_video_frames(c: &mut Criterion) {
         quality: 5,
         volume: 0, // doesnt matter for this test
         format: None,
-        inverted: false, // doesnt matter for this test
-        no_lines: false, // doesnt matter for this test
-        char_width: 0,   // doesnt matter for this test
-        char_height: 0,  // doesnt matter for this test
+        inverted: false,   // doesnt matter for this test
+        no_lines: false,   // doesnt matter for this test
+        only_lines: false, // doesnt matter for this test
+        char_width: 0,     // doesnt matter for this test
+        char_height: 0,    // doesnt matter for this test
         media_mode: aar::cli::MediaModes::Video,
         processing_mode: aar::cli::ProcessingModes::Gpu,
     };
@@ -44,10 +45,11 @@ fn grab_device_frames(c: &mut Criterion) {
         quality: 5,
         volume: 0, // doesnt matter for this test
         format: None,
-        inverted: false, // doesnt matter for this test
-        no_lines: false, // doesnt matter for this test
-        char_width: 0,   // doesnt matter for this test
-        char_height: 0,  // doesnt matter for this test
+        inverted: false,   // doesnt matter for this test
+        no_lines: false,   // doesnt matter for this test
+        only_lines: false, // doesnt matter for this test
+        char_width: 0,     // doesnt matter for this test
+        char_height: 0,    // doesnt matter for this test
         media_mode: aar::cli::MediaModes::Stream,
         processing_mode: aar::cli::ProcessingModes::Gpu,
     };

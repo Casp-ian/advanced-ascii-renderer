@@ -1,5 +1,6 @@
 use super::types::*;
 
+use crate::cli::Args;
 use crate::CharSet;
 use crate::ColorSet;
 
@@ -20,13 +21,7 @@ const BRIGHT_MANGENTA: &str = "\x1b[95m";
 const BRIGHT_CYAN: &str = "\x1b[96m";
 const BRIGHT_WHITE: &str = "\x1b[97m";
 
-pub fn translate_to_text(
-    data: Vec<Vec<PixelData>>,
-    set: CharSet,
-    color: ColorSet,
-    inverted: bool,
-    no_lines: bool,
-) -> String {
+pub fn translate_to_text(args: &Args, data: Vec<Vec<PixelData>>) -> String {
     let mut result = "".to_string();
 
     // TODO also not really pixels
@@ -36,9 +31,16 @@ pub fn translate_to_text(
             result += "\n";
         }
         for data in row {
-            result += get_ansi_color_code(&color, data.color.0).as_str();
+            result += get_ansi_color_code(&args.color, data.color.0).as_str();
 
-            result += get_char(&set, data, inverted, no_lines).as_str();
+            result += get_char(
+                &args.set,
+                data,
+                args.inverted,
+                args.no_lines,
+                args.only_lines,
+            )
+            .as_str();
         }
     }
 
@@ -56,7 +58,13 @@ pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 3]) -> String {
     }
 }
 
-pub fn get_char(char_set: &CharSet, pixel: &PixelData, inverted: bool, no_lines: bool) -> String {
+pub fn get_char(
+    char_set: &CharSet,
+    pixel: &PixelData,
+    inverted: bool,
+    no_lines: bool,
+    only_lines: bool,
+) -> String {
     if !no_lines {
         match pixel.direction {
             Direction::TopToBottom => return "|".to_string(),
@@ -67,25 +75,29 @@ pub fn get_char(char_set: &CharSet, pixel: &PixelData, inverted: bool, no_lines:
         }
     }
 
-    let set = match char_set {
-        &CharSet::Ascii => vec![" ", ".", "\"", "+", "o", "?", "#"],
-        &CharSet::Numbers => vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
-        &CharSet::Discord => vec![
-            ":black_large_square:",
-            ":new_moon:",
-            ":elephant:",
-            ":fog:",
-            ":white_large_square:",
-        ],
-        &CharSet::Braile => vec!["⠀", "⢀", "⡈", "⡊", "⢕", "⢝", "⣫", "⣟", "⣿"],
-    };
+    if !only_lines {
+        let set = match char_set {
+            &CharSet::Ascii => vec![" ", ".", "\"", "+", "o", "?", "#"],
+            &CharSet::Numbers => vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+            &CharSet::Discord => vec![
+                ":black_large_square:",
+                ":new_moon:",
+                ":elephant:",
+                ":fog:",
+                ":white_large_square:",
+            ],
+            &CharSet::Braile => vec!["⠀", "⢀", "⡈", "⡊", "⢕", "⢝", "⣫", "⣟", "⣿"],
+        };
 
-    let brightness = if inverted {
-        1.0 - pixel.brightness
-    } else {
-        pixel.brightness
-    };
-    let id: f32 = brightness * (set.len() - 1) as f32;
+        let brightness = if inverted {
+            1.0 - pixel.brightness
+        } else {
+            pixel.brightness
+        };
+        let id: f32 = brightness * (set.len() - 1) as f32;
 
-    return set[id.round() as usize].to_string();
+        return set[id.round() as usize].to_string();
+    }
+
+    return " ".to_string();
 }

@@ -44,6 +44,10 @@ pub struct Args {
     #[arg(long)]
     pub no_lines: bool,
 
+    /// remove everythin appart from the lines
+    #[arg(long)]
+    pub only_lines: bool,
+
     // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
     // i do not know how to get these, so for now we have hardcoded defaults
     /// the width of a character in pixels, only use if the defaults dont suit your needs or dont match your font
@@ -73,6 +77,9 @@ pub enum MediaModes {
     Video,
     /// just like video but for things like your webcam
     Stream,
+    // TODO
+    // /// just like video but wait for the entire thing to be rendered at a flat framerate before displaying
+    // VideoPrerender,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
