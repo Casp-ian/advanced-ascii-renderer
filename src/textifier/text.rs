@@ -67,10 +67,10 @@ pub fn get_char(
 ) -> String {
     if !no_lines {
         match pixel.direction {
-            Direction::TopToBottom => return "|".to_string(),
-            Direction::LeftToRight => return "-".to_string(),
-            Direction::TopleftToBotright => return "\\".to_string(),
-            Direction::ToprightToBotleft => return "/".to_string(),
+            Direction::VerticalBar => return "|".to_string(),
+            Direction::Dash => return "-".to_string(), // NOTE this could be replaced with a em dash, but i think it looks better with the normal dash
+            Direction::Backslash => return "\\".to_string(),
+            Direction::Slash => return "/".to_string(),
             _ => (),
         }
     }

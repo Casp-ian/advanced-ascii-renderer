@@ -12,19 +12,24 @@ pub struct PixelData {
 #[derive(Clone, Debug, Copy)]
 pub enum Direction {
     None,
-    TopToBottom,
-    ToprightToBotleft,
-    LeftToRight,
-    TopleftToBotright,
+    VerticalBar,
+    Slash,
+    Dash,
+    Backslash,
+    // Underscore
+    // Comma,
+    // X,
+    // LeftParenthesis,
+    // RightParenthesis,
 }
 impl Direction {
     pub fn from_int(int: u32) -> Direction {
         match int {
             0 => Direction::None,
-            1 => Direction::TopToBottom,
-            2 => Direction::ToprightToBotleft,
-            3 => Direction::LeftToRight,
-            4 => Direction::TopleftToBotright,
+            1 => Direction::VerticalBar,
+            2 => Direction::Slash,
+            3 => Direction::Dash,
+            4 => Direction::Backslash,
             _ => panic!(),
         }
     }
