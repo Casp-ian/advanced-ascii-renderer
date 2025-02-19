@@ -25,6 +25,7 @@ pub struct Textifier<'a> {
 }
 impl<'b> Textifier<'b> {
     pub fn new<'a>(args: &'a Args) -> Textifier<'a> {
+        // process character magic
         return Textifier {
             args,
             abandon_gpu: false,

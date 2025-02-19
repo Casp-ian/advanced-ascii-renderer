@@ -178,27 +178,6 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let outsideXC = (outsideXL + outsideXR) / 2;
     let outsideYC = (outsideYL + outsideYR) / 2;
 
-    // var counts = array<u32, 5>(0, 0, 0, 0, 0);
-    // for (var i: u32 = outsideXL; i <= outsideXR; i++) {
-    //     for (var j: u32 = outsideYL; j <= outsideYR; j++) {
-    //         counts[intermediateBuffer[coordsInput(i, j)].direction]++;
-    //     }
-    // }
-    
-    // // 1/25th of pixels in a square
-    // let partOfPixels: u32 = ((outsideXR - outsideXL) + (outsideYR - outsideYL)) / 25;
-
-    // var maxIndex: u32 = 0;
-    // var maxCount: u32 = partOfPixels; // this is the doorstep, if there are more than this amount of edge pixels it will be an edge
-    // for (var i: u32 = 1; i < 5; i++) {
-    //     if (counts[i] > maxCount) {
-    //         maxIndex = i;
-    //         maxCount = counts[i];
-    //     }
-    // }
-    
-    // let direction = maxIndex;
-
     let direction = intermediateBuffer[coordsInput(outsideXC, outsideYC)].direction;
 
     // TODO get center pixel or some other downscaling method

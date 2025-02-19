@@ -3,12 +3,12 @@ use crossterm::terminal;
 pub fn get_cols_and_rows(
     char_width: u32,
     char_height: u32,
-    columns: Option<u32>,
-    rows: Option<u32>,
+    optional_columns: Option<u32>,
+    optional_rows: Option<u32>,
     image_width: u32,
     image_height: u32,
 ) -> (u32, u32) {
-    let (columns, rows) = match (columns, rows) {
+    let (columns, rows) = match (optional_columns, optional_rows) {
         (Some(x), Some(y)) => {
             eprintln!(
                 "you specified both image collumns and rows, image aspect ratio might be messed up"
@@ -26,7 +26,12 @@ pub fn get_cols_and_rows(
         (None, None) => get_fitting_terminal(char_width, char_height, image_width, image_height),
     };
 
-    (columns, rows)
+    if image_width / columns < 8 || image_height / rows < 8 {
+        // NOTE when we switch to a font reading method this will no longer be an issue
+        eprintln!("lines could very well be fucked");
+    }
+
+    return (columns, rows);
 }
 
 pub fn calculate_other_side_by_aspect(
