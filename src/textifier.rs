@@ -1,10 +1,12 @@
 use core::panic;
 
-use image::{DynamicImage, GenericImageView, Rgb};
+use image::{DynamicImage, GenericImageView, Rgb, Rgba};
+use lines::get_line_pieces;
 use pollster::FutureExt;
 
 mod cpu;
 mod gpu;
+mod lines;
 mod text;
 mod types;
 
@@ -70,10 +72,17 @@ impl<'b> Textifier<'b> {
         gpu_image_height: u32,
         columns: u32,
         rows: u32,
+        line_pieces: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<(), String> {
-        let thing =
-            gpu::WgpuContext::setup(gpu_image_width, gpu_image_height, columns, rows).block_on();
-        match thing {
+        let context = gpu::WgpuContext::setup(
+            gpu_image_width,
+            gpu_image_height,
+            columns,
+            rows,
+            line_pieces,
+        )
+        .block_on();
+        match context {
             Err(e) => {
                 return Err(e.to_string());
             }
@@ -91,6 +100,7 @@ impl<'b> Textifier<'b> {
                 self.input_height,
                 self.output_width,
                 self.output_height,
+                get_line_pieces(),
             )?;
         }
         let gpu = self.gpu.as_ref().unwrap();

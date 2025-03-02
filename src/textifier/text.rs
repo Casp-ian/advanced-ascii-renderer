@@ -68,7 +68,7 @@ pub fn get_char(
     if !no_lines {
         match pixel.direction {
             Direction::VerticalBar => return "|".to_string(),
-            Direction::Dash => return "-".to_string(), // NOTE this could be replaced with a em dash, but i think it looks better with the normal dash
+            Direction::Minus => return "-".to_string(), // NOTE this could be replaced with a em dash, but i think it looks better with the normal dash
             Direction::Backslash => return "\\".to_string(),
             Direction::Slash => return "/".to_string(),
             _ => (),

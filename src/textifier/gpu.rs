@@ -29,6 +29,7 @@ impl WgpuContext {
         input_height: u32,
         output_width: u32,
         output_height: u32,
+        lines: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
         let adapter = instance
@@ -65,19 +66,6 @@ impl WgpuContext {
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-
-        // let input_texture = device.create_texture(&wgpu::TextureDescriptor {
-        //     label: Some("input texture"),
-        //     size: input_texture_size,
-        //     mip_level_count: 1,
-        //     sample_count: 1,
-        //     dimension: wgpu::TextureDimension::D2,
-        //     format: wgpu::TextureFormat::Rgba8Unorm,
-        //     usage: wgpu::TextureUsages::TEXTURE_BINDING
-        //         | wgpu::TextureUsages::COPY_DST
-        //         | wgpu::TextureUsages::RENDER_ATTACHMENT,
-        //     view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
-        // });
 
         // For portability reasons, WebGPU draws a distinction between memory that is
         // accessible by the CPU and memory that is accessible by the GPU. Only
@@ -128,6 +116,14 @@ impl WgpuContext {
                 output_width,
                 output_height,
             ]),
+        });
+
+        // TODO unhardcode this shit
+        // for now 18 chArs wide, every char
+        let line_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("line buffer"),
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+            contents: lines.as_raw(),
         });
 
         let pipeline_edges = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -188,6 +184,7 @@ impl WgpuContext {
             label: None,
             layout: &pipeline_scale.get_bind_group_layout(0),
             entries: &[
+                // settings
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -196,6 +193,7 @@ impl WgpuContext {
                         size: None,
                     }),
                 },
+                // input
                 wgpu::BindGroupEntry {
                     binding: 1,
                     // resource: wgpu::BindingResource::TextureView(
@@ -207,6 +205,7 @@ impl WgpuContext {
                         size: None,
                     }),
                 },
+                // intermediate
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -215,10 +214,20 @@ impl WgpuContext {
                         size: None,
                     }),
                 },
+                // output
                 wgpu::BindGroupEntry {
                     binding: 3,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &output_storage_buffer,
+                        offset: 0,
+                        size: None,
+                    }),
+                },
+                // lines
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &line_buffer,
                         offset: 0,
                         size: None,
                     }),

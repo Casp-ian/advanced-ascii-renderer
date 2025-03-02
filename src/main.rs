@@ -1,4 +1,4 @@
-use aar::run_with_args;
+use aar::run;
 use std::{fs::remove_file, process::ExitCode};
 
 use aar::cli::get_cli_args;
@@ -15,7 +15,7 @@ fn main() -> ExitCode {
 
     let args = get_cli_args();
 
-    let result: Result<(), String> = run_with_args(&args);
+    let result: Result<(), String> = run(&args);
 
     match result {
         Ok(_) => {

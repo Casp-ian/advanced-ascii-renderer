@@ -10,7 +10,7 @@ pub mod terminal;
 pub mod textifier;
 use textifier::Textifier;
 
-pub fn run_with_args(args: &Args) -> Result<(), String> {
+pub fn run(args: &Args) -> Result<(), String> {
     let result: Result<(), String> = match args.media_mode {
         MediaModes::Try => try_them_all(args),
         MediaModes::Image => do_image_stuff(args),
