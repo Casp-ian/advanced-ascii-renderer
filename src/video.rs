@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use image::{io::Reader, DynamicImage};
+use image::{DynamicImage, io::Reader};
 
 use crate::{Args, MediaModes};
 
@@ -18,7 +18,10 @@ pub struct FrameGrabber<'a> {
 }
 impl<'b> FrameGrabber<'b> {
     pub fn new<'a>(args: &'a Args) -> Result<FrameGrabber<'a>, String> {
+        let start_time = Instant::now();
+
         if args.volume > 0 {
+            // start audio sub-process
             Command::new("ffplay")
                 .args([args.path.to_str().unwrap()])
                 .args(["-nodisp"])
@@ -28,8 +31,6 @@ impl<'b> FrameGrabber<'b> {
                 .spawn()
                 .expect("audio broke");
         }
-
-        let start_time = Instant::now();
 
         return Ok(FrameGrabber { args, start_time });
     }

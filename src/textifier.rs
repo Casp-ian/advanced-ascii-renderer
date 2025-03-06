@@ -1,6 +1,4 @@
-use core::panic;
-
-use image::{DynamicImage, GenericImageView, Rgb, Rgba};
+use image::{DynamicImage, GenericImageView, Luma, Rgb};
 use lines::get_line_pieces;
 use pollster::FutureExt;
 
@@ -13,8 +11,8 @@ mod types;
 use self::gpu::WgpuContext;
 use self::text::translate_to_text;
 use self::types::*;
-use crate::terminal::get_cols_and_rows;
 use crate::Args;
+use crate::terminal::get_cols_and_rows;
 
 pub struct Textifier<'a> {
     args: &'a Args,
@@ -72,7 +70,7 @@ impl<'b> Textifier<'b> {
         gpu_image_height: u32,
         columns: u32,
         rows: u32,
-        line_pieces: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
+        line_pieces: image::ImageBuffer<Luma<u8>, Vec<u8>>,
     ) -> Result<(), String> {
         let context = gpu::WgpuContext::setup(
             gpu_image_width,
@@ -141,7 +139,10 @@ impl<'b> Textifier<'b> {
         }
         let data = self.run_gpu(image);
         if data.is_err() {
-            eprintln!("gpu failed, running as gpu_simple, if you want full features on cpu run with gpu_full. keep in mind it will be very slow");
+            eprintln!(
+                // "gpu failed, running as cpu_simple, if you want full features on cpu run with cpu_full. keep in mind it can be very slow"
+                "gpu failed, running as cpu_simple, cpu_full is not yet implemented"
+            );
             self.abandon_gpu = true;
             return cpu::simple(
                 image,

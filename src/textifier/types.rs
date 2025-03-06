@@ -14,32 +14,19 @@ pub enum Direction {
     None,
     Slash,
     Backslash,
-    Caret,
-    V,
-    LessThan,
-    GreaterThan,
-    OpeningParenthesis,
-    ClosingParenthesis,
-    OpeningCurlyBrackets,
-    ClosingCurlyBrackets,
-    Star,
+    Dash,
+    Bar,
     Underscore,
-    VerticalBar,
-    Plus,
-    Equals,
-    Minus,
-    Semicolon,
-    Comma,
 }
 impl Direction {
     pub fn from_int(int: u32) -> Direction {
-        // TODO fix
         match int {
             0 => Direction::None,
-            1 => Direction::VerticalBar,
-            2 => Direction::Slash,
-            3 => Direction::Minus,
-            4 => Direction::Backslash,
+            1 => Direction::Slash,
+            2 => Direction::Backslash,
+            3 => Direction::Dash,
+            4 => Direction::Bar,
+            5 => Direction::Underscore,
             _ => panic!(),
         }
     }

@@ -1,8 +1,8 @@
 use super::types::*;
 
-use crate::cli::Args;
 use crate::CharSet;
 use crate::ColorSet;
+use crate::cli::Args;
 
 const BLACK: &str = "\x1b[30m";
 const RED: &str = "\x1b[31m";
@@ -67,10 +67,11 @@ pub fn get_char(
 ) -> String {
     if !no_lines {
         match pixel.direction {
-            Direction::VerticalBar => return "|".to_string(),
-            Direction::Minus => return "-".to_string(), // NOTE this could be replaced with a em dash, but i think it looks better with the normal dash
-            Direction::Backslash => return "\\".to_string(),
             Direction::Slash => return "/".to_string(),
+            Direction::Backslash => return "\\".to_string(),
+            Direction::Dash => return "-".to_string(), // NOTE this could be replaced with a em dash, but i think it looks better with the normal dash
+            Direction::Bar => return "|".to_string(),
+            Direction::Underscore => return "_".to_string(),
             _ => (),
         }
     }

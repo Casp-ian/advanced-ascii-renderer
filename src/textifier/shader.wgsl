@@ -16,7 +16,7 @@ var<storage, read_write> outputBuffer: array<PixelData>;
 
 @group(0)
 @binding(4)
-var<uniform> lineBuffer: array<LinePiece, 18>;
+var<uniform> lineBuffer: array<LinePiece, 5>;
 
 const PI = 3.14159265358979323846264338327950288;
 
@@ -31,30 +31,13 @@ struct Rotation {
     direction: u32,
 }
 
+// TODO ngl this physically hurts me too ;-;
 struct LinePiece {
     a: vec4<f32>,
     b: vec4<f32>,
     c: vec4<f32>,
     d: vec4<f32>,
-    e: vec4<f32>,
-    f: vec4<f32>,
-    g: vec4<f32>,
-    h: vec4<f32>,
-    i: vec4<f32>,
-    j: vec4<f32>,
-    k: vec4<f32>,
-    l: vec4<f32>,
-    m: vec4<f32>,
-    n: vec4<f32>,
-    o: vec4<f32>,
-    p: vec4<f32>,
 }
-// we dont have enums in wgsl yet
-// 0: None
-// 1: |
-// 2: /
-// 3: -
-// 4: \
 
 // x
 // <
@@ -78,9 +61,10 @@ fn coordsOutput(x: u32, y: u32) -> u32 {
     return x + (y * resolutions.outputWidth);
 }
 
-fn average(vec: vec3<f32>) -> f32 {
-    // return dot(vec, vec3<f32>(1.0 / 3.0)); // averaging using the dot product
-    return (vec.r * 0.2126) + (vec.g * 0.7152) + (vec.b * 0.0722); 
+// TODO alpha influence on brightness
+fn brightness(vec: vec3<f32>) -> f32 {
+    // return dot(vec, vec3f32>(1.0 / 3.0)); // average
+    return dot(vec, vec3<f32>(0.2126, 0.7152, 0.0722));
 }
 
 @compute
@@ -128,7 +112,6 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // TODO rename magnitude threshold
     let al = 0.05;
     if (ar > al && ag > al && ab > al) {
-        // average all
         gx = (gxrgb.r + gxrgb.g + gxrgb.g) / 3;
         gy = (gyrgb.r + gyrgb.g + gyrgb.g) / 3;
     } else if (ar > al && ag > al) {
@@ -211,9 +194,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let test: f32 = lineBuffer[0].a[0];
 
-    // TODO alpha influence?
-    let brightness = (colorPixel.r * 0.2126) + (colorPixel.g * 0.7152) + (colorPixel.b * 0.0722); 
-    // let brightness = average(colorPixel.rgb); 
+    let brightness = brightness(colorPixel.rgb); 
 
     outputBuffer[coordsOutput(global_id.x, global_id.y)] = PixelData(
         direction,

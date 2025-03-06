@@ -1,4 +1,4 @@
-use image::Rgba;
+use image::{Luma, Rgba};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 
 pub struct WgpuContext {
@@ -29,7 +29,7 @@ impl WgpuContext {
         input_height: u32,
         output_width: u32,
         output_height: u32,
-        lines: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
+        lines: image::ImageBuffer<Luma<u8>, Vec<u8>>,
     ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
         let adapter = instance
@@ -119,7 +119,7 @@ impl WgpuContext {
         });
 
         // TODO unhardcode this shit
-        // for now 18 chArs wide, every char
+        // for now 5 chars high, every char is 8x8
         let line_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("line buffer"),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
@@ -333,10 +333,10 @@ impl WgpuContext {
             // dropped before we unmap the buffer.
             drop(data);
             self.output_staging_buffer.unmap(); // Unmaps buffer from memory
-                                                // If you are familiar with C++ these 2 lines can be thought of similarly to:
-                                                //   delete myPointer;
-                                                //   myPointer = NULL;
-                                                // It effectively frees the memory
+            // If you are familiar with C++ these 2 lines can be thought of similarly to:
+            //   delete myPointer;
+            //   myPointer = NULL;
+            // It effectively frees the memory
 
             // Returns data from buffer
             return Ok(result);
