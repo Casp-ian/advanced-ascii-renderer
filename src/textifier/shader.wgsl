@@ -8,7 +8,7 @@ var<storage, read_write> inputTexture: array<u32>; // packed u8 color values
 
 @group(0)
 @binding(2)
-var<storage, read_write> intermediateBuffer: array<Rotation>;
+var<storage, read_write> intermediateBuffer: array<IntermediateData>;
 
 @group(0)
 @binding(3)
@@ -27,8 +27,9 @@ struct Dimensions {
     outputHeight: u32,
 }
 
-struct Rotation {
-    direction: u32,
+struct IntermediateData {
+    edge: u32,
+    // direction: u32,
 }
 
 // TODO ngl this physically hurts me too ;-;
@@ -71,7 +72,7 @@ fn brightness(vec: vec3<f32>) -> f32 {
 @workgroup_size(1)
 fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     if (global_id.x == 0) || (global_id.y == 0) || (global_id.x >= resolutions.inputWidth - 1) || (global_id.y >= resolutions.inputHeight - 1) {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(0); // none
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // none
         return;
     }
 
@@ -139,37 +140,41 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         gx = gxrgb.b;
         gy = gyrgb.b;
     } else {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(0); // none
+    // this shouldnt happen i think ???
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // none
         return;
     }
-
-    let dir = atan2(gy, gx);
-    // grab a picture of a unit circle to make sense of this next part
-
-    if ((dir <= PI / 6.0) && (dir >= -1.0 * PI / 6.0))
-        || ((dir >= 5.0 * PI / 6.0) || (dir <= -5.0 * PI / 6.0))
-    {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(1); // '|'
-        
-    } else if ((dir >= PI / 6.0) && (dir <= PI / 3.0))
-        || ((dir >= -5.0 * PI / 6.0) && (dir <= -2.0 * PI / 3.0))
-    {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(2); // '/'
-        
-    } else if ((dir <= 2.0 * PI / 3.0) && (dir >= PI / 3.0))
-        || ((dir >= -2.0 * PI / 3.0) && (dir <= -1.0 * PI / 3.0))
-    {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(3); // '-'
-        
-    } else if ((dir <= -1.0 * PI / 6.0) && (dir >= -1.0 * PI / 3.0))
-        || ((dir <= 5.0 * PI / 6.0) && (dir >= 2.0 * PI / 3.0))
-    {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(4); // '\'
-        
-    } else {
-        // TODO this really should be impossible to happen, but it does, i think the atan2 function returns an error or something and then this happens
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = Rotation(0); // none
+    if (gx + gy > 0.5) {
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(1);
     }
+
+    // let dir = atan2(gy, gx);
+    // // grab a picture of a unit circle to make sense of this next part
+
+    // if ((dir <= PI / 6.0) && (dir >= -1.0 * PI / 6.0))
+    //     || ((dir >= 5.0 * PI / 6.0) || (dir <= -5.0 * PI / 6.0))
+    // {
+    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(1); // '|'
+        
+    // } else if ((dir >= PI / 6.0) && (dir <= PI / 3.0))
+    //     || ((dir >= -5.0 * PI / 6.0) && (dir <= -2.0 * PI / 3.0))
+    // {
+    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(2); // '/'
+        
+    // } else if ((dir <= 2.0 * PI / 3.0) && (dir >= PI / 3.0))
+    //     || ((dir >= -2.0 * PI / 3.0) && (dir <= -1.0 * PI / 3.0))
+    // {
+    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(3); // '-'
+        
+    // } else if ((dir <= -1.0 * PI / 6.0) && (dir >= -1.0 * PI / 3.0))
+    //     || ((dir <= 5.0 * PI / 6.0) && (dir >= 2.0 * PI / 3.0))
+    // {
+    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(4); // '\'
+        
+    // } else {
+    //     // TODO this really should be impossible to happen, but it does, i think the atan2 function returns an error or something and then this happens
+    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // none
+    // }
 
 }
 
@@ -184,15 +189,19 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let outsideXC = (outsideXL + outsideXR) / 2;
     let outsideYC = (outsideYL + outsideYR) / 2;
 
-    let direction = intermediateBuffer[coordsInput(outsideXC, outsideYC)].direction;
+    let TODOREMOVE: f32 = lineBuffer[0].a[0];
+    // map pixels to 8x8 dimensions for checking angles, for color take center??
+
+    var direction: u32 = 0;
+    if (intermediateBuffer[coordsInput(outsideXC, outsideYC)].edge == 1) {
+        direction = 1u;
+    }
+
+    // NOTE here is where we do it
 
     // TODO get center pixel or some other downscaling method
     let packedColorPixel = inputTexture[coordsInput(outsideXC, outsideYC)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
-    // TODO grab more surrounding pixels to scale down better
-    // especialy the angles
-
-    let test: f32 = lineBuffer[0].a[0];
 
     let brightness = brightness(colorPixel.rgb); 
 
