@@ -8,7 +8,7 @@ pub struct WgpuContext {
     bind_group_edges: wgpu::BindGroup,
     pipeline_scale: wgpu::ComputePipeline,
     bind_group_scale: wgpu::BindGroup,
-    input_buffer: wgpu::Buffer,
+    input_texture: wgpu::Texture,
     intermediate_storage_buffer: wgpu::Buffer,
     output_storage_buffer: wgpu::Buffer,
     output_staging_buffer: wgpu::Buffer,
@@ -17,7 +17,7 @@ pub struct WgpuContext {
     input_height: u32,
     output_width: u32,
     output_height: u32,
-    input_buffer_size: wgpu::BufferAddress,
+    input_texture_size: wgpu::Extent3d,
     intermediate_buffer_size: wgpu::BufferAddress,
     output_buffer_size: wgpu::BufferAddress,
 }
@@ -52,20 +52,41 @@ impl WgpuContext {
         // Our shader, kindly compiled with Naga.
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-        // let input_texture_size = wgpu::Extent3d {
-        //     width: input_width,
-        //     height: input_height,
-        //     depth_or_array_layers: 1,
-        // };
+        let input_texture_size = wgpu::Extent3d {
+            width: input_width,
+            height: input_height,
+            depth_or_array_layers: 1,
+        };
 
-        // 4 u8 for every pixel 4 * 1
-        let input_buffer_size = (input_width * input_height * 4) as wgpu::BufferAddress;
-        let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("staging buffer"),
-            size: input_buffer_size,
-            usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
+        let input_texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("staging texture"),
+            size: input_texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
         });
+
+        let input_texture_view = input_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::MirrorRepeat,
+            address_mode_v: wgpu::AddressMode::MirrorRepeat,
+            address_mode_w: wgpu::AddressMode::MirrorRepeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        });
+        // 4 u8 for every pixel 4 * 1
+        // let input_buffer_size = (input_width * input_height * 4) as wgpu::BufferAddress;
+        // let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        //     label: Some("staging buffer"),
+        //     size: input_buffer_size,
+        //     usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        //     mapped_at_creation: false,
+        // });
 
         // For portability reasons, WebGPU draws a distinction between memory that is
         // accessible by the CPU and memory that is accessible by the GPU. Only
@@ -151,17 +172,14 @@ impl WgpuContext {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    // resource: wgpu::BindingResource::TextureView(
-                    //     &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
-                    // ),
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &input_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
+                    resource: wgpu::BindingResource::TextureView(&input_texture_view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &intermediate_storage_buffer,
                         offset: 0,
@@ -196,18 +214,15 @@ impl WgpuContext {
                 // input
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    // resource: wgpu::BindingResource::TextureView(
-                    //     &input_texture.create_view(&wgpu::TextureViewDescriptor::default()),
-                    // ),
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &input_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
+                    resource: wgpu::BindingResource::TextureView(&input_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
                 },
                 // intermediate
                 wgpu::BindGroupEntry {
-                    binding: 2,
+                    binding: 3,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &intermediate_storage_buffer,
                         offset: 0,
@@ -216,7 +231,7 @@ impl WgpuContext {
                 },
                 // output
                 wgpu::BindGroupEntry {
-                    binding: 3,
+                    binding: 4,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &output_storage_buffer,
                         offset: 0,
@@ -225,7 +240,7 @@ impl WgpuContext {
                 },
                 // lines
                 wgpu::BindGroupEntry {
-                    binding: 4,
+                    binding: 5,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                         buffer: &line_buffer,
                         offset: 0,
@@ -242,7 +257,7 @@ impl WgpuContext {
             bind_group_edges,
             pipeline_scale,
             bind_group_scale,
-            input_buffer,
+            input_texture,
             intermediate_storage_buffer,
             output_storage_buffer,
             output_staging_buffer,
@@ -251,7 +266,7 @@ impl WgpuContext {
             input_height,
             output_width,
             output_height,
-            input_buffer_size,
+            input_texture_size,
             intermediate_buffer_size,
             output_buffer_size,
         });
@@ -263,8 +278,25 @@ impl WgpuContext {
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<Vec<f32>, String> {
         // will get the image to process to the gpu
-        self.queue
-            .write_buffer(&self.input_buffer, 0, input_image.as_raw());
+        // self.queue
+        //     .write_buffer(&self.input_buffer, 0, input_image.as_raw());
+        self.queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &self.input_texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            &input_image,
+            // The layout of the texture
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * self.input_width),
+                rows_per_image: Some(self.input_height),
+            },
+            self.input_texture_size,
+        );
 
         // A command encoder executes one or many pipelines.
         // It is to WebGPU what a command buffer is to Vulkan.
@@ -277,6 +309,7 @@ impl WgpuContext {
                 label: None,
                 timestamp_writes: None,
             });
+
             compute_pass.set_pipeline(&self.pipeline_edges);
             compute_pass.set_bind_group(0, Some(&self.bind_group_edges), &[]);
             compute_pass.insert_debug_marker("edges");
