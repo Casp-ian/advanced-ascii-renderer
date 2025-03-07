@@ -27,7 +27,7 @@ impl Direction {
             3 => Direction::Dash,
             4 => Direction::Bar,
             5 => Direction::Underscore,
-            _ => panic!(),
+            _ => panic!("Received invalid direction enum from shader, {}", int),
         }
     }
 }

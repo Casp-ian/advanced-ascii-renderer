@@ -63,147 +63,103 @@ fn coordsOutput(x: u32, y: u32) -> u32 {
 }
 
 // TODO alpha influence on brightness
-fn brightness(vec: vec3<f32>) -> f32 {
-    // return dot(vec, vec3f32>(1.0 / 3.0)); // average
-    return dot(vec, vec3<f32>(0.2126, 0.7152, 0.0722));
+fn brightness(vec: vec4<f32>) -> f32 {
+    return dot(vec.rgb, vec3<f32>(0.2126, 0.7152, 0.0722)) * vec.a;
+}
+
+fn mdot(left: mat3x3<f32>, right: mat3x3<f32>) -> f32 {
+    return dot(left[0], right[0]) + dot(left[1], right[1]) + dot(left[2], right[2]);
 }
 
 @compute
 @workgroup_size(1)
 fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
+    // cant do edge detection on the outer edges of the image
     if (global_id.x == 0) || (global_id.y == 0) || (global_id.x >= resolutions.inputWidth - 1) || (global_id.y >= resolutions.inputHeight - 1) {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // none
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0);
         return;
     }
 
-    // TODO another 'larger kernel' edge detection to make edges thinner
-    // should also maybe be per color
-    // dont even understand why the edges are thick right now
+    // NOTE: there is a small advantage to splitting edge detection to collors instead of grayscaling, tho honestly it is pretty negligable
+    // source: https://stevehanov.ca/blog/?id=62
 
-    // TODO check if this even has any effect :(    
-    // we do sobel for every color, so for example the edge between a green and red area are very visible, and not only between white and black
-    // maybe all of this sobel stuff needs to be adjusted for color space now?
+    // TODO make edge detection size scale with proportion to output size
 
-    // Sobel
-    let gxrgb = (
-          1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb
-        + 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 0)] ).rgb
-        + 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb
-        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb
-        - 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 0)] ).rgb
-        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb
-    ) / 8;
-    let gyrgb = (
-          1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] ).rgb
-        + 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y - 1)] ).rgb
-        + 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ).rgb
-        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] ).rgb
-        - 2 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 0, global_id.y + 1)] ).rgb
-        - 1 * unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ).rgb
-    ) / 8;
+    let kernel = mat3x3f(
+        vec3f(
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y - 1)] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0, global_id.y - 1)] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y - 1)] ))
+        ),
+        vec3f(
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 0)] )),
+            0.0,
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 0)] ))
+        ),
+        vec3f(
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 1, global_id.y + 1)] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0, global_id.y + 1)] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + 1, global_id.y + 1)] ))
+        )
+    );
+    
+    let sobelX = mat3x3f(
+        -1, 0, 1,
+        -2, 0, 2,
+        -1, 0, 1,
+    );
+    let sobelY = mat3x3f(
+        -1, -2, -1,
+        0, 0, 0,
+        1, 2, 1,
+    );
 
-    // magnitudes for every color channel
-    let ar = sqrt(pow(gxrgb.r, 2.0) + pow(gyrgb.r, 2.0));
-    let ag = sqrt(pow(gxrgb.g, 2.0) + pow(gyrgb.g, 2.0));
-    let ab = sqrt(pow(gxrgb.b, 2.0) + pow(gyrgb.b, 2.0));
+    var gx: f32 = mdot(kernel, sobelX);
+    var gy: f32 = mdot(kernel, sobelY);
 
-    var gx: f32 = 0.0;
-    var gy: f32 = 0.0;
 
-    // TODO rename magnitude threshold
-    let al = 0.05;
-    if (ar > al && ag > al && ab > al) {
-        gx = (gxrgb.r + gxrgb.g + gxrgb.g) / 3;
-        gy = (gyrgb.r + gyrgb.g + gyrgb.g) / 3;
-    } else if (ar > al && ag > al) {
-        // red green
-        gx = (gxrgb.r + gxrgb.g) / 2;
-        gy = (gyrgb.r + gyrgb.g) / 2;
-    } else if (ar > al && ab > al) {
-        // red blue
-        gx = (gxrgb.r + gxrgb.b) / 2;
-        gy = (gyrgb.r + gyrgb.b) / 2;
-    } else if (ag > al && ab > al) {
-        // red green
-        gx = (gxrgb.g + gxrgb.b) / 2;
-        gy = (gyrgb.g + gyrgb.b) / 2;
-    } else if (ar > al) {
-        // red
-        gx = gxrgb.r;
-        gy = gyrgb.r;
-    } else if (ag > al) {
-        // green
-        gx = gxrgb.g;
-        gy = gyrgb.g;
-    } else if (ab > al) {
-        // blue
-        gx = gxrgb.b;
-        gy = gyrgb.b;
+    if ((gx * gx + gy * gy) > (0.7 * 0.7)) {
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(1); // edge
     } else {
-    // this shouldnt happen i think ???
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // none
-        return;
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // no edge
     }
-    if (gx + gy > 0.5) {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(1);
-    }
-
-    // let dir = atan2(gy, gx);
-    // // grab a picture of a unit circle to make sense of this next part
-
-    // if ((dir <= PI / 6.0) && (dir >= -1.0 * PI / 6.0))
-    //     || ((dir >= 5.0 * PI / 6.0) || (dir <= -5.0 * PI / 6.0))
-    // {
-    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(1); // '|'
-        
-    // } else if ((dir >= PI / 6.0) && (dir <= PI / 3.0))
-    //     || ((dir >= -5.0 * PI / 6.0) && (dir <= -2.0 * PI / 3.0))
-    // {
-    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(2); // '/'
-        
-    // } else if ((dir <= 2.0 * PI / 3.0) && (dir >= PI / 3.0))
-    //     || ((dir >= -2.0 * PI / 3.0) && (dir <= -1.0 * PI / 3.0))
-    // {
-    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(3); // '-'
-        
-    // } else if ((dir <= -1.0 * PI / 6.0) && (dir >= -1.0 * PI / 3.0))
-    //     || ((dir <= 5.0 * PI / 6.0) && (dir >= 2.0 * PI / 3.0))
-    // {
-    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(4); // '\'
-        
-    // } else {
-    //     // TODO this really should be impossible to happen, but it does, i think the atan2 function returns an error or something and then this happens
-    //     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0); // none
-    // }
-
 }
 
 @compute
 @workgroup_size(1)
 fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    // square of pixels to take into account when downscaling
-    let outsideXL = global_id.x * resolutions.inputWidth / (resolutions.outputWidth + 1);
-    let outsideYL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
-    let outsideXR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
-    let outsideYR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
-    let outsideXC = (outsideXL + outsideXR) / 2;
-    let outsideYC = (outsideYL + outsideYR) / 2;
-
     let TODOREMOVE: f32 = lineBuffer[0].a[0];
-    // map pixels to 8x8 dimensions for checking angles, for color take center??
 
-    var direction: u32 = 0;
-    if (intermediateBuffer[coordsInput(outsideXC, outsideYC)].edge == 1) {
-        direction = 1u;
+    // square of pixels to take into account when downscaling
+    let XL = global_id.x * resolutions.inputWidth / (resolutions.outputWidth + 1);
+    let YL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
+    let XR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
+    let YR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
+
+    var count: u32 = 0u;
+    for (var y = YL; y <= YR; y++) {
+        for (var x = XL; x <= XR; x++) {
+            if (intermediateBuffer[coordsInput(x, y)].edge == 1) {
+                // TODO score linepieces here
+                count++;
+            }
+        }
     }
 
-    // NOTE here is where we do it
+    // var direction: u32 = count / (resolutions.outputWidth * resolutions.outputHeight);
+    var direction: u32 = 0u;
+    
+    if (count != 0u) {
+        direction = (count % 5) + 1;
+    }
 
-    // TODO get center pixel or some other downscaling method
-    let packedColorPixel = inputTexture[coordsInput(outsideXC, outsideYC)];
+    let XC = (XL + XR) / 2;
+    let YC = (YL + YR) / 2;
+    
+    let packedColorPixel = inputTexture[coordsInput(XC, YC)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
 
-    let brightness = brightness(colorPixel.rgb); 
+    let brightness = brightness(colorPixel); 
 
     outputBuffer[coordsOutput(global_id.x, global_id.y)] = PixelData(
         direction,
