@@ -27,8 +27,7 @@ pub fn get_cols_and_rows(
     };
 
     if image_width / columns < 8 || image_height / rows < 8 {
-        // NOTE when we switch to a font reading method this will no longer be an issue
-        eprintln!("lines could very well be fucked");
+        eprintln!("not enough detail in image, lines will probably not show up correctly");
     }
 
     return (columns, rows);

@@ -10,7 +10,8 @@ pub fn get_line_pieces() -> image::ImageBuffer<Luma<u8>, Vec<u8>> {
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
-        return image.to_luma8();
+        let luma = image.to_luma8();
+        return luma;
     }
 
     panic!();

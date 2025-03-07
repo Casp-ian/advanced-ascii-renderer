@@ -16,9 +16,9 @@ var<storage, read_write> outputBuffer: array<PixelData>;
 
 @group(0)
 @binding(4)
-var<uniform> lineBuffer: array<LinePiece, 5>;
-
-const PI = 3.14159265358979323846264338327950288;
+var<uniform> lineBuffer: array<vec4<u32>, 20>;
+// 5 char * 4 vecs per char
+// this will always be accessed through linePiecePixel();
 
 struct Dimensions {
     inputWidth: u32,
@@ -32,27 +32,20 @@ struct IntermediateData {
     // direction: u32,
 }
 
-// TODO ngl this physically hurts me too ;-;
-struct LinePiece {
-    a: vec4<f32>,
-    b: vec4<f32>,
-    c: vec4<f32>,
-    d: vec4<f32>,
-}
-
-// x
-// <
-// >
-// (
-// )
-// ^
-// O
-// v
-
 struct PixelData {
     direction: u32,
     color: u32,
     brightness: f32,
+}
+
+fn linePiecePixel(i: u32, x: u32, y: u32) -> f32 {
+    // i fucking hate this
+    // this is probably right
+    // i would explain if i understood
+    let a: u32 = (i * 4) + (y / 2);
+    let b: u32 = (y % 2) + (x / 4);
+    let c: u32 = x % 4;
+    return unpack4x8unorm(lineBuffer[a][b])[c];
 }
 
 fn coordsInput(x: u32, y: u32) -> u32 {
@@ -62,7 +55,6 @@ fn coordsOutput(x: u32, y: u32) -> u32 {
     return x + (y * resolutions.outputWidth);
 }
 
-// TODO alpha influence on brightness
 fn brightness(vec: vec4<f32>) -> f32 {
     return dot(vec.rgb, vec3<f32>(0.2126, 0.7152, 0.0722)) * vec.a;
 }
@@ -80,7 +72,7 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    // NOTE: there is a small advantage to splitting edge detection to collors instead of grayscaling, tho honestly it is pretty negligable
+    // NOTE: there is a small advantage to splitting edge detection to collors instead of grayscaling, i think stevehanov just picked bad examples
     // source: https://stevehanov.ca/blog/?id=62
 
     // TODO make edge detection size scale with proportion to output size
@@ -128,31 +120,46 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 @compute
 @workgroup_size(1)
 fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let TODOREMOVE: f32 = lineBuffer[0].a[0];
-
     // square of pixels to take into account when downscaling
     let XL = global_id.x * resolutions.inputWidth / (resolutions.outputWidth + 1);
     let YL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
     let XR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
     let YR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
 
-    var count: u32 = 0u;
+    var counts: array<u32, 5> = array(0u, 0u, 0u, 0u, 0u);
     for (var y = YL; y <= YR; y++) {
         for (var x = XL; x <= XR; x++) {
+            // if both actual pixel, and linepiece pixel are edges, then add that linepiece score
             if (intermediateBuffer[coordsInput(x, y)].edge == 1) {
-                // TODO score linepieces here
-                count++;
+
+                let lineX = ((x - XL) * 8) / (XR - XL);
+                let lineY = ((y - YL) * 8) / (YR - YL);
+
+                for (var i: u32 = 0u; i < 5u; i++) {
+
+                    if (linePiecePixel(i, lineX, lineY) > 0.0) {
+                        counts[i]++;
+                    }
+
+                }
             }
         }
     }
 
-    // var direction: u32 = count / (resolutions.outputWidth * resolutions.outputHeight);
-    var direction: u32 = 0u;
-    
-    if (count != 0u) {
-        direction = (count % 5) + 1;
-    }
+    // TODO configurable through uniform
+    // let lineThreshold: u32 = resolutions.outputWidth * resolutions.outputHeight / 1000u;
+    let lineThreshold: u32 = 0u;
 
+    var direction: u32 = 0u;
+    var threshold: u32 = lineThreshold;
+    
+    for (var i: u32 = 0u; i < 5u; i++) {
+        if (counts[i] > threshold) {
+            direction = i + 1;
+            threshold = counts[i];
+        }
+    }
+    
     let XC = (XL + XR) / 2;
     let YC = (YL + YR) / 2;
     
