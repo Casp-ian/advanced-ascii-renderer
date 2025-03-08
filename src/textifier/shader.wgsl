@@ -45,9 +45,15 @@ fn linePiecePixel(i: u32, x: u32, y: u32) -> f32 {
 }
 
 fn coordsInput(x: u32, y: u32) -> u32 {
-    return x + (y * resolutions.inputWidth);
+    // NOTE: right now this is just repeat, it should be mirrored repeat
+    let a: u32 = x % resolutions.inputWidth;
+    let b: u32 = y % resolutions.inputHeight;
+    return a + (b * resolutions.inputWidth);
 }
+
 fn coordsOutput(x: u32, y: u32) -> u32 {
+    // i dont think we want this to wrap
+    // bit we dont have asserts...
     return x + (y * resolutions.outputWidth);
 }
 
@@ -73,8 +79,8 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     // TODO make edge detection size scale with proportion to output size
 
-    let stepX = u32(ceil((f32(resolutions.inputWidth) / f32(resolutions.outputWidth)) / 6.0)); // magic number for now
-    let stepY = u32(ceil((f32(resolutions.inputHeight) / f32(resolutions.outputHeight)) / 6.0)); // magic number for now
+    let stepX = 1u + u32(floor((f32(resolutions.inputWidth) / f32(resolutions.outputWidth)) / 6.0)); // magic number for now
+    let stepY = 1u + u32(floor((f32(resolutions.inputHeight) / f32(resolutions.outputHeight)) / 6.0)); // magic number for now
     // let stepX = 1u;
     // let stepY = 1u;
 
@@ -135,29 +141,25 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
         for (var x = XL; x <= XR; x++) {
             // if both actual pixel, and linepiece pixel are edges, then add that linepiece score
 
-            let edge: f32 = intermediateBuffer[coordsInput(x, y)].edge;
+            let edge: f32 = (intermediateBuffer[coordsInput(x, y)].edge - 0.5) * 2.0;
             // if (edge > 0.7) {
 
             let lineX = ((x - XL) * 8) / (XR - XL);
             let lineY = ((y - YL) * 8) / (YR - YL);
 
             for (var i: u32 = 0u; i < 5u; i++) {
+                let edgeScore: f32 = (linePiecePixel(i, lineX, lineY) - 0.5) * 2.0;
 
-                let newScore: f32 = edge * linePiecePixel(i, lineX, lineY);
-                let fraction: f32 = 1.0 / f32((XR - XL) * (YR - YL));
-
-                scores[i] += newScore;
-                scores[i] -= fraction * 10;
+                scores[i] += edge * edgeScore;
             }
         }
     }
 
-    // TODO configurable through uniform
-    // let lineThreshold: u32 = resolutions.outputWidth * resolutions.outputHeight / 1000u;
-    let lineThreshold: f32 = 0.0;
-
+    // score is +1.0 for every edge both in linepiece and edges
+    // score is -1.0 for every edge that is not in linepiece but in edges
+    // score is 0.0 for every edge that is half in linepiece but in edges
+    var threshold: f32 = 0.0;
     var direction: u32 = 0u;
-    var threshold: f32 = lineThreshold;
     
     for (var i: u32 = 0u; i < 5u; i++) {
         if (scores[i] > threshold) {

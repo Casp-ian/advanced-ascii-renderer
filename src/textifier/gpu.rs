@@ -52,28 +52,14 @@ impl WgpuContext {
         // Our shader, kindly compiled with Naga.
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-        // let input_texture_size = wgpu::Extent3d {
-        //     width: input_width,
-        //     height: input_height,
-        //     depth_or_array_layers: 1,
-        // };
-
         // 4 u8 for every pixel 4 * 1
         let input_buffer_size = (input_width * input_height * 4) as wgpu::BufferAddress;
         let input_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("staging buffer"),
+            label: Some("input buffer"),
             size: input_buffer_size,
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-
-        // For portability reasons, WebGPU draws a distinction between memory that is
-        // accessible by the CPU and memory that is accessible by the GPU. Only
-        // buffers accessible by the CPU can be mapped and accessed by the CPU and
-        // only buffers visible to the GPU can be used in shaders. In order to get
-        // data from the GPU, we need to use CommandEncoder::copy_buffer_to_buffer
-        // (which we will later) to copy the buffer modified by the GPU into a
-        // mappable, CPU-accessible buffer which we'll create here.
 
         // 1 u32 enum for every pixel 1 * 4 = 4
         let intermediate_buffer_size = (input_width * input_height * 4) as wgpu::BufferAddress;
@@ -262,7 +248,7 @@ impl WgpuContext {
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
     ) -> Result<Vec<f32>, String> {
-        // will get the image to process to the gpu
+        // will get the image to the gpu
         self.queue
             .write_buffer(&self.input_buffer, 0, input_image.as_raw());
 
@@ -281,6 +267,7 @@ impl WgpuContext {
             compute_pass.set_bind_group(0, Some(&self.bind_group_edges), &[]);
             compute_pass.insert_debug_marker("edges");
 
+            compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
             compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
         }
 
