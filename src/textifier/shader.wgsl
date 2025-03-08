@@ -2,23 +2,20 @@
 @binding(0)
 var<uniform> resolutions: Dimensions;
 
-@group(0) @binding(1)
-var t_diffuse: texture_2d<f32>;
-@group(0) @binding(2)
-var s_diffuse: sampler;
-
-// var<storage, read_write> inputTexture: array<u32>; // packed u8 color values
+@group(0)
+@binding(1)
+var<storage, read_write> inputTexture: array<u32>; // packed u8 color values
 
 @group(0)
-@binding(3)
+@binding(2)
 var<storage, read_write> intermediateBuffer: array<IntermediateData>;
 
 @group(0)
-@binding(4)
+@binding(3)
 var<storage, read_write> outputBuffer: array<PixelData>;
 
 @group(0)
-@binding(5)
+@binding(4)
 var<uniform> lineBuffer: array<vec4<u32>, 20>;
 // 5 char * 4 vecs per char
 // this will always be accessed through linePiecePixel();
@@ -83,19 +80,19 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let kernel = mat3x3f(
         vec3f(
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x - stepX), f32(global_id.y - stepY) ), 1.0 )),
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x - 0    ), f32(global_id.y - stepY) ), 1.0 )),
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x + stepX), f32(global_id.y - stepY) ), 1.0 )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y - stepY )] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y - stepY )] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y - stepY )] )),
         ),
         vec3f(
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x - stepX), f32(global_id.y + 0    ) ), 1.0 )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + 0     )] )),
             0.0,
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x + stepX), f32(global_id.y + 0    ) ), 1.0 )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + 0     )] )),
         ),
         vec3f(
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x - stepX), f32(global_id.y + stepY) ), 1.0 )),
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x - 0    ), f32(global_id.y + stepY) ), 1.0 )),
-            brightness(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(global_id.x + stepX), f32(global_id.y + stepY) ), 1.0 )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + stepY )] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y + stepY )] )),
+            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + stepY )] )),
         )
     );
     
@@ -172,7 +169,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let XC = (XL + XR) / 2;
     let YC = (YL + YR) / 2;
     
-    let packedColorPixel =  pack4x8unorm(textureSampleLevel(t_diffuse, s_diffuse, vec2f(f32(XC) / f32(resolutions.inputWidth), f32(YC) / f32(resolutions.inputHeight)), 1.0));
+    let packedColorPixel = inputTexture[coordsInput(XC, YC)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
 
     let brightness = brightness(colorPixel); 

@@ -5,15 +5,18 @@ edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# [lib]
+# crate-type = ["cdylib", "lib"] # cdylib for wasm; lib for native
+
 [profile.release]
 strip = "debuginfo"
 lto = "fat"
 panic = "abort"
 
+
 # [unstable]
 # build-std = ["std", "panic_abort"]
 # build-std-features = ["panic_immediate_abort"]
-
 [[bench]]
 name = "bench"
 harness = false
@@ -22,11 +25,11 @@ harness = false
 criterion = "0.5.1"
 
 [dependencies]
-bytemuck = "1.22.0"
-clap = { version = "4.5.31", features = ["derive"] }
+bytemuck = "1.18.0"
+clap = { version = "4.4.18", features = ["derive"] }
 crossterm = "0.28.1"
 ctrlc = "3.4.5"
-flume = "0.11.1"
-image = "0.25.5"
+flume = "0.11.0"
+image = "0.24.8"
 pollster = "0.4.0"
-wgpu = "24.0.1"
+wgpu = "23.0.1"
