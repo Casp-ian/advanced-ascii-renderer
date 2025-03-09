@@ -118,12 +118,6 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var magnitude: f32 = sqrt(gx * gx + gy * gy);
 
-    if (magnitude > 0.8) {
-        magnitude = 1.0;
-    } else {
-        magnitude = 0.0;
-    }
-
     intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(magnitude);
 }
 
@@ -131,34 +125,58 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 @workgroup_size(1)
 fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // square of pixels to take into account when downscaling
+
+    let chunkX: f32 = f32(resolutions.inputWidth) / f32(resolutions.outputWidth + 1);
+    let offsetX: f32 = chunkX * f32(global_id.x);
+    let chunkletX: f32 = chunkX / 8.0;
+
+    let chunkY: f32 = f32(resolutions.inputHeight) / f32(resolutions.outputHeight + 1);
+    let offsetY: f32 = chunkY * f32(global_id.y);
+    let chunkletY: f32 = chunkY / 8.0;
+    
     let XL = global_id.x * resolutions.inputWidth / (resolutions.outputWidth + 1);
     let YL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
     let XR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
     let YR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
 
     var scores: array<f32, 5> = array(0.0, 0.0, 0.0, 0.0, 0.0);
-    for (var y = YL; y <= YR; y++) {
-        for (var x = XL; x <= XR; x++) {
-            // if both actual pixel, and linepiece pixel are edges, then add that linepiece score
 
-            let edge: f32 = (intermediateBuffer[coordsInput(x, y)].edge - 0.5) * 2.0;
-            // if (edge > 0.7) {
-
-            let lineX = ((x - XL) * 8) / (XR - XL);
-            let lineY = ((y - YL) * 8) / (YR - YL);
+    for (var y: u32 = 0; y < 8; y++) {
+        let lineY: u32 = u32( offsetY + (chunkletY * f32(y)) );
+        for (var x: u32 = 0; x < 8; x++) {
+            let lineX: u32 = u32( offsetX + (chunkletX * f32(x)) );
+            
+            let edge: f32 = (intermediateBuffer[coordsInput(lineX, lineY)].edge - 0.5) * 2.0;
 
             for (var i: u32 = 0u; i < 5u; i++) {
-                let edgeScore: f32 = (linePiecePixel(i, lineX, lineY) - 0.5) * 2.0;
+                let edgeScore: f32 = (linePiecePixel(i, x, y) - 0.5) * 2.0;
 
                 scores[i] += edge * edgeScore;
             }
         }
+
     }
+    // for (var y = YL; y <= YR; y++) {
+    //     let lineY = ((y - YL) * 8) / (YR - YL);
+    //     for (var x = XL; x <= XR; x++) {
+    //         let lineX = ((x - XL) * 8) / (XR - XL);
+
+    //         let edge: f32 = (intermediateBuffer[coordsInput(x, y)].edge - 0.5) * 2.0;
+    //         // if (edge > 0.7) {
+
+
+    //         for (var i: u32 = 0u; i < 5u; i++) {
+    //             let edgeScore: f32 = (linePiecePixel(i, lineX, lineY) - 0.5) * 2.0;
+
+    //             scores[i] += edge * edgeScore;
+    //         }
+    //     }
+    // }
 
     // score is +1.0 for every edge both in linepiece and edges
     // score is -1.0 for every edge that is not in linepiece but in edges
     // score is 0.0 for every edge that is half in linepiece but in edges
-    var threshold: f32 = 0.0;
+    var threshold: f32 = 3.0;
     var direction: u32 = 0u;
     
     for (var i: u32 = 0u; i < 5u; i++) {
