@@ -143,6 +143,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     for (var y: u32 = 0; y < 8; y++) {
         let lineY: u32 = u32( offsetY + (chunkletY * f32(y)) );
+
         for (var x: u32 = 0; x < 8; x++) {
             let lineX: u32 = u32( offsetX + (chunkletX * f32(x)) );
             
@@ -156,27 +157,11 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
         }
 
     }
-    // for (var y = YL; y <= YR; y++) {
-    //     let lineY = ((y - YL) * 8) / (YR - YL);
-    //     for (var x = XL; x <= XR; x++) {
-    //         let lineX = ((x - XL) * 8) / (XR - XL);
-
-    //         let edge: f32 = (intermediateBuffer[coordsInput(x, y)].edge - 0.5) * 2.0;
-    //         // if (edge > 0.7) {
-
-
-    //         for (var i: u32 = 0u; i < 5u; i++) {
-    //             let edgeScore: f32 = (linePiecePixel(i, lineX, lineY) - 0.5) * 2.0;
-
-    //             scores[i] += edge * edgeScore;
-    //         }
-    //     }
-    // }
-
+    
     // score is +1.0 for every edge both in linepiece and edges
     // score is -1.0 for every edge that is not in linepiece but in edges
     // score is 0.0 for every edge that is half in linepiece but in edges
-    var threshold: f32 = 3.0;
+    var threshold: f32 = 2.5;
     var direction: u32 = 0u;
     
     for (var i: u32 = 0u; i < 5u; i++) {
