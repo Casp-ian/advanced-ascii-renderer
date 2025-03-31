@@ -77,6 +77,7 @@ impl<'b> Textifier<'b> {
             gpu_image_height,
             columns,
             rows,
+            self.args.threshold,
             line_pieces,
         )
         .block_on();

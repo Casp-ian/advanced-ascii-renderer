@@ -40,6 +40,10 @@ pub struct Args {
     #[arg(long)]
     pub inverted: bool,
 
+    /// from -64 to 64, this is the threshold for how close a line needs to be to count
+    #[arg(long)]
+    pub threshold: f32,
+
     /// remove the lines characters like /-\|
     #[arg(long)]
     pub no_lines: bool,
@@ -75,7 +79,7 @@ pub enum MediaModes {
     Image,
     /// textify frames as fast as it can, requires ffmpeg
     Video,
-    /// just like video but for things like your webcam
+    /// just like video but for things like your webcam that dont have a set duration
     Stream,
     // TODO
     // /// just like video but wait for the entire thing to be rendered at a flat framerate before displaying

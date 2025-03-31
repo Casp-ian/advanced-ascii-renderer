@@ -1,6 +1,6 @@
 @group(0)
 @binding(0)
-var<uniform> resolutions: Dimensions;
+var<uniform> config: ConfigData;
 
 @group(0)
 @binding(1)
@@ -16,15 +16,16 @@ var<storage, read_write> outputBuffer: array<PixelData>;
 
 @group(0)
 @binding(4)
-var<uniform> lineBuffer: array<vec4<u32>, 20>;
 // 5 char * 4 vecs per char
 // this will always be accessed through linePiecePixel();
+var<uniform> lineBuffer: array<vec4<u32>, 20>;
 
-struct Dimensions {
+struct ConfigData {
     inputWidth: u32,
     inputHeight: u32,
     outputWidth: u32,
     outputHeight: u32,
+    threshold: f32,
 }
 
 struct IntermediateData {
@@ -46,15 +47,15 @@ fn linePiecePixel(i: u32, x: u32, y: u32) -> f32 {
 
 fn coordsInput(x: u32, y: u32) -> u32 {
     // NOTE: right now this is just repeat, it should be mirrored repeat
-    let a: u32 = x % resolutions.inputWidth;
-    let b: u32 = y % resolutions.inputHeight;
-    return a + (b * resolutions.inputWidth);
+    let a: u32 = x % config.inputWidth;
+    let b: u32 = y % config.inputHeight;
+    return a + (b * config.inputWidth);
 }
 
 fn coordsOutput(x: u32, y: u32) -> u32 {
     // i dont think we want this to wrap
     // bit we dont have asserts...
-    return x + (y * resolutions.outputWidth);
+    return x + (y * config.outputWidth);
 }
 
 fn brightness(vec: vec4<f32>) -> f32 {
@@ -69,7 +70,7 @@ fn mdot(left: mat3x3<f32>, right: mat3x3<f32>) -> f32 {
 @workgroup_size(1)
 fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // cant do edge detection on the outer edges of the image
-    if (global_id.x == 0) || (global_id.y == 0) || (global_id.x >= resolutions.inputWidth - 1) || (global_id.y >= resolutions.inputHeight - 1) {
+    if (global_id.x == 0) || (global_id.y == 0) || (global_id.x >= config.inputWidth - 1) || (global_id.y >= config.inputHeight - 1) {
         intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0);
         return;
     }
@@ -79,8 +80,8 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     // TODO make edge detection size scale with proportion to output size
 
-    let stepX = 1u + u32(floor((f32(resolutions.inputWidth) / f32(resolutions.outputWidth)) / 6.0)); // magic number for now
-    let stepY = 1u + u32(floor((f32(resolutions.inputHeight) / f32(resolutions.outputHeight)) / 6.0)); // magic number for now
+    let stepX = 1u + u32(floor((f32(config.inputWidth) / f32(config.outputWidth)) / 6.0)); // magic number for now
+    let stepY = 1u + u32(floor((f32(config.inputHeight) / f32(config.outputHeight)) / 6.0)); // magic number for now
     // let stepX = 1u;
     // let stepY = 1u;
 
@@ -109,8 +110,8 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     );
     let sobelY = mat3x3f(
         -1, -2, -1,
-        0, 0, 0,
-        1, 2, 1,
+         0,  0,  0,
+         1,  2,  1,
     );
 
     var gx: f32 = mdot(kernel, sobelX);
@@ -126,18 +127,18 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
 fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // square of pixels to take into account when downscaling
 
-    let chunkX: f32 = f32(resolutions.inputWidth) / f32(resolutions.outputWidth + 1);
+    let chunkX: f32 = f32(config.inputWidth) / f32(config.outputWidth + 1);
     let offsetX: f32 = chunkX * f32(global_id.x);
     let chunkletX: f32 = chunkX / 8.0;
 
-    let chunkY: f32 = f32(resolutions.inputHeight) / f32(resolutions.outputHeight + 1);
+    let chunkY: f32 = f32(config.inputHeight) / f32(config.outputHeight + 1);
     let offsetY: f32 = chunkY * f32(global_id.y);
     let chunkletY: f32 = chunkY / 8.0;
     
-    let XL = global_id.x * resolutions.inputWidth / (resolutions.outputWidth + 1);
-    let YL = global_id.y * resolutions.inputHeight / (resolutions.outputHeight + 1);
-    let XR = ((global_id.x + 1) * resolutions.inputWidth / (resolutions.outputWidth + 1)) - 1;
-    let YR = ((global_id.y + 1) * resolutions.inputHeight / (resolutions.outputHeight + 1)) - 1;
+    let XL = global_id.x * config.inputWidth / (config.outputWidth + 1);
+    let YL = global_id.y * config.inputHeight / (config.outputHeight + 1);
+    let XR = ((global_id.x + 1) * config.inputWidth / (config.outputWidth + 1)) - 1;
+    let YR = ((global_id.y + 1) * config.inputHeight / (config.outputHeight + 1)) - 1;
 
     var scores: array<f32, 5> = array(0.0, 0.0, 0.0, 0.0, 0.0);
 
@@ -161,7 +162,8 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // score is +1.0 for every edge both in linepiece and edges
     // score is -1.0 for every edge that is not in linepiece but in edges
     // score is 0.0 for every edge that is half in linepiece but in edges
-    var threshold: f32 = 1.0;
+    var threshold: f32 = config.threshold;
+    // var threshold: f32 = 1.0;
     var direction: u32 = 0u;
     
     for (var i: u32 = 0u; i < 5u; i++) {

@@ -29,6 +29,7 @@ impl WgpuContext {
         input_height: u32,
         output_width: u32,
         output_height: u32,
+        threshold: f32,
         lines: image::ImageBuffer<Luma<u8>, Vec<u8>>,
     ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
@@ -93,7 +94,7 @@ impl WgpuContext {
             mapped_at_creation: false,
         });
 
-        let uniform_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        let config_buffer = device.create_buffer_init(&BufferInitDescriptor {
             label: Some("uniform buffer"),
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
             contents: bytemuck::cast_slice::<u32, u8>(&[
@@ -101,6 +102,7 @@ impl WgpuContext {
                 input_height,
                 output_width,
                 output_height,
+                bytemuck::cast::<f32, u32>(threshold),
             ]),
         });
 
@@ -130,7 +132,7 @@ impl WgpuContext {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &uniform_buffer,
+                        buffer: &config_buffer,
                         offset: 0,
                         size: None,
                     }),
@@ -174,7 +176,7 @@ impl WgpuContext {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &uniform_buffer,
+                        buffer: &config_buffer,
                         offset: 0,
                         size: None,
                     }),
