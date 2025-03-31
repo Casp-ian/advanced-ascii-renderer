@@ -4,22 +4,22 @@ use crate::CharSet;
 use crate::ColorSet;
 use crate::cli::Args;
 
-const BLACK: &str = "\x1b[30m";
-const RED: &str = "\x1b[31m";
-const GREEN: &str = "\x1b[32m";
-const YELLOW: &str = "\x1b[33m";
-const BLUE: &str = "\x1b[34m";
-const MAGENTA: &str = "\x1b[35m";
-const CYAN: &str = "\x1b[36m";
-const WHITE: &str = "\x1b[37m";
-const GRAY: &str = "\x1b[90m";
-const BRIGHT_RED: &str = "\x1b[91m";
-const BRIGHT_GREEN: &str = "\x1b[92m";
-const BRIGHT_YELLOW: &str = "\x1b[93m";
-const BRIGHT_BLUE: &str = "\x1b[94m";
-const BRIGHT_MANGENTA: &str = "\x1b[95m";
-const BRIGHT_CYAN: &str = "\x1b[96m";
-const BRIGHT_WHITE: &str = "\x1b[97m";
+// const BLACK: &str = "\x1b[30m";
+// const RED: &str = "\x1b[31m";
+// const GREEN: &str = "\x1b[32m";
+// const YELLOW: &str = "\x1b[33m";
+// const BLUE: &str = "\x1b[34m";
+// const MAGENTA: &str = "\x1b[35m";
+// const CYAN: &str = "\x1b[36m";
+// const WHITE: &str = "\x1b[37m";
+// const GRAY: &str = "\x1b[90m";
+// const BRIGHT_RED: &str = "\x1b[91m";
+// const BRIGHT_GREEN: &str = "\x1b[92m";
+// const BRIGHT_YELLOW: &str = "\x1b[93m";
+// const BRIGHT_BLUE: &str = "\x1b[94m";
+// const BRIGHT_MANGENTA: &str = "\x1b[95m";
+// const BRIGHT_CYAN: &str = "\x1b[96m";
+// const BRIGHT_WHITE: &str = "\x1b[97m";
 
 pub fn translate_to_text(args: &Args, data: Vec<Vec<PixelData>>) -> String {
     let mut result = "".to_string();

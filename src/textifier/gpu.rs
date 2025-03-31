@@ -9,16 +9,16 @@ pub struct WgpuContext {
     pipeline_scale: wgpu::ComputePipeline,
     bind_group_scale: wgpu::BindGroup,
     input_buffer: wgpu::Buffer,
-    intermediate_storage_buffer: wgpu::Buffer,
+    // intermediate_storage_buffer: wgpu::Buffer,
     output_storage_buffer: wgpu::Buffer,
     output_staging_buffer: wgpu::Buffer,
-    uniform_buffer: wgpu::Buffer,
+    // uniform_buffer: wgpu::Buffer,
     input_width: u32,
     input_height: u32,
     output_width: u32,
     output_height: u32,
-    input_buffer_size: wgpu::BufferAddress,
-    intermediate_buffer_size: wgpu::BufferAddress,
+    // input_buffer_size: wgpu::BufferAddress,
+    // intermediate_buffer_size: wgpu::BufferAddress,
     output_buffer_size: wgpu::BufferAddress,
 }
 
@@ -229,16 +229,16 @@ impl WgpuContext {
             pipeline_scale,
             bind_group_scale,
             input_buffer,
-            intermediate_storage_buffer,
+            // intermediate_storage_buffer,
             output_storage_buffer,
             output_staging_buffer,
-            uniform_buffer,
+            // uniform_buffer,
             input_width,
             input_height,
             output_width,
             output_height,
-            input_buffer_size,
-            intermediate_buffer_size,
+            // input_buffer_size,
+            // intermediate_buffer_size,
             output_buffer_size,
         });
     }
@@ -295,40 +295,33 @@ impl WgpuContext {
         // Submits command encoder for processing
         self.queue.submit(Some(encoder.finish()));
 
-        // Note that we're not calling `.await` here.
+        // We now map the download buffer so we can read it. Mapping tells wgpu that we want to read/write
+        // to the buffer directly by the CPU and it should not permit any more GPU operations on the buffer.
+        //
+        // Mapping requires that the GPU be finished using the buffer before it resolves, so mapping has a callback
+        // to tell you when the mapping is complete.
         let buffer_slice = self.output_staging_buffer.slice(..);
+        buffer_slice.map_async(wgpu::MapMode::Read, |_| {
+            // In this case we know exactly when the mapping will be finished,
+            // so we don't need to do anything in the callback.
+        });
 
-        // Sets the buffer up for mapping, sending over the result of the mapping back to us when it is finished.
-        let (sender, receiver) = flume::bounded(1);
-        buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
-
-        // Poll the device in a blocking manner so that our future resolves.
-        // In an actual application, `device.poll(...)` should
-        // be called in an event loop or on another thread.
+        // Wait for the GPU to finish working on the submitted work. This doesn't work on WebGPU, so we would need
+        // to rely on the callback to know when the buffer is mapped.
         self.device.poll(wgpu::Maintain::wait()).panic_on_timeout();
+        // self.device.poll(wgpu::PollType::Wait).unwrap();
 
-        // Awaits until `buffer_future` can be read from
-        if let Ok(Ok(())) = receiver.recv_async().await {
-            // Gets contents of buffer
-            let data = buffer_slice.get_mapped_range();
+        // We can now read the data from the buffer.
+        let data = buffer_slice.get_mapped_range();
 
-            // Since contents are got in bytes, this converts these bytes back to u32
-            let result = bytemuck::cast_slice(&data).to_vec();
-            // let result = data.to_vec();
+        // Convert the data back to a slice of f32.
+        let result: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
 
-            // With the current interface, we have to make sure all mapped views are
-            // dropped before we unmap the buffer.
-            drop(data);
-            self.output_staging_buffer.unmap(); // Unmaps buffer from memory
-            // If you are familiar with C++ these 2 lines can be thought of similarly to:
-            //   delete myPointer;
-            //   myPointer = NULL;
-            // It effectively frees the memory
+        // Unmaps buffer from memory
+        drop(data);
+        self.output_staging_buffer.unmap();
 
-            // Returns data from buffer
-            return Ok(result);
-        } else {
-            return Err("cant run on gpu".to_string()); // TODO stupid message
-        }
+        // Print out the result.
+        return Ok(result);
     }
 }

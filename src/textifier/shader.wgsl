@@ -161,7 +161,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // score is +1.0 for every edge both in linepiece and edges
     // score is -1.0 for every edge that is not in linepiece but in edges
     // score is 0.0 for every edge that is half in linepiece but in edges
-    var threshold: f32 = 2.5;
+    var threshold: f32 = 1.0;
     var direction: u32 = 0u;
     
     for (var i: u32 = 0u; i < 5u; i++) {

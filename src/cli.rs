@@ -51,11 +51,11 @@ pub struct Args {
     // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
     // i do not know how to get these, so for now we have hardcoded defaults
     /// the width of a character in pixels, only use if the defaults dont suit your needs or dont match your font
-    #[arg(long, default_value_t = 10)]
+    #[arg(long, default_value_t = 9)]
     pub char_width: u32,
 
     /// the height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
-    #[arg(long, default_value_t = 18)]
+    #[arg(long, default_value_t = 20)]
     pub char_height: u32,
 
     /// choose how to read the file
