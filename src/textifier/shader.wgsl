@@ -156,7 +156,6 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
                 scores[i] += edge * edgeScore;
             }
         }
-
     }
     
     // score is +1.0 for every edge both in linepiece and edges

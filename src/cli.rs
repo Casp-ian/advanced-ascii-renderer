@@ -41,7 +41,7 @@ pub struct Args {
     pub inverted: bool,
 
     /// from -64 to 64, this is the threshold for how close a line needs to be to count
-    #[arg(long)]
+    #[arg(long, default_value_t = 8.0)]
     pub threshold: f32,
 
     /// remove the lines characters like /-\|
