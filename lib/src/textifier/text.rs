@@ -1,8 +1,8 @@
 use super::types::*;
 
-use crate::CharSet;
-use crate::ColorSet;
-use crate::cli::Args;
+use crate::config::CharSet;
+use crate::config::ColorSet;
+use crate::config::Config;
 
 // const BLACK: &str = "\x1b[30m";
 // const RED: &str = "\x1b[31m";
@@ -21,7 +21,7 @@ use crate::cli::Args;
 // const BRIGHT_CYAN: &str = "\x1b[96m";
 // const BRIGHT_WHITE: &str = "\x1b[97m";
 
-pub fn translate_to_text(args: &Args, data: Vec<Vec<PixelData>>) -> String {
+pub fn translate_to_text(args: &Config, data: Vec<Vec<PixelData>>) -> String {
     let mut result = "".to_string();
 
     // TODO also not really pixels

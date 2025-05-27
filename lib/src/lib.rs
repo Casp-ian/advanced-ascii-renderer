@@ -1,16 +1,14 @@
+use config::{Config, MediaModes};
 use image::io::Reader;
 
-pub mod cli;
-use cli::*;
+pub mod config;
 
 pub mod video;
-
-pub mod terminal;
 
 pub mod textifier;
 use textifier::Textifier;
 
-pub fn run(args: &Args) -> Result<(), String> {
+pub fn run(args: &Config) -> Result<(), String> {
     let result: Result<(), String> = match args.media_mode {
         MediaModes::Try => try_them_all(args),
         MediaModes::Image => do_image_stuff(args),
@@ -19,7 +17,7 @@ pub fn run(args: &Args) -> Result<(), String> {
     return result;
 }
 
-fn try_them_all(args: &Args) -> Result<(), String> {
+fn try_them_all(args: &Config) -> Result<(), String> {
     let image_result = do_image_stuff(args);
     // TODO make sure .gif and other multiuse formats falls into video first then image
 
@@ -37,7 +35,7 @@ fn try_them_all(args: &Args) -> Result<(), String> {
     }
 }
 
-fn do_image_stuff(args: &Args) -> Result<(), String> {
+fn do_image_stuff(args: &Config) -> Result<(), String> {
     let reader_result = Reader::open(&args.path);
     if reader_result.is_err() {
         return Err("Cannot find file".to_string());
@@ -57,7 +55,7 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
     }
 }
 
-fn do_video_stuff(args: &Args) -> Result<(), String> {
+fn do_video_stuff(args: &Config) -> Result<(), String> {
     let mut textifier = Textifier::new(&args);
 
     let video_frame_grabber = video::FrameGrabber::new(args).unwrap();

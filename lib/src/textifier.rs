@@ -11,11 +11,10 @@ mod types;
 use self::gpu::WgpuContext;
 use self::text::translate_to_text;
 use self::types::*;
-use crate::Args;
-use crate::terminal::get_cols_and_rows;
+use crate::config::{Config, ProcessingModes};
 
 pub struct Textifier<'a> {
-    args: &'a Args,
+    args: &'a Config,
     abandon_gpu: bool,
     input_width: u32,
     input_height: u32,
@@ -24,7 +23,7 @@ pub struct Textifier<'a> {
     gpu: Option<WgpuContext>,
 }
 impl<'b> Textifier<'b> {
-    pub fn new<'a>(args: &'a Args) -> Textifier<'a> {
+    pub fn new<'a>(args: &'a Config) -> Textifier<'a> {
         // process character magic
         return Textifier {
             args,
@@ -45,23 +44,15 @@ impl<'b> Textifier<'b> {
         }
 
         let (image_width, image_height) = image.dimensions();
-        let (columns, rows) = get_cols_and_rows(
-            self.args.char_width,
-            self.args.char_height,
-            self.args.width,
-            self.args.height,
-            image_width,
-            image_height,
-        );
 
-        if image_width == 0 || image_height == 0 || columns == 0 || rows == 0 {
+        if image_width == 0 || image_height == 0 || self.args.width == 0 || self.args.height == 0 {
             panic!("calculating dimensions failed, none of the values should be zero");
         }
 
         self.input_width = image_width;
         self.input_height = image_height;
-        self.output_width = columns;
-        self.output_height = rows;
+        self.output_width = self.args.width;
+        self.output_height = self.args.height;
     }
 
     fn setup_gpu(
@@ -161,16 +152,16 @@ impl<'b> Textifier<'b> {
 
         let data: Result<Vec<Vec<PixelData>>, String>;
         data = match self.args.processing_mode {
-            crate::ProcessingModes::Try => self.run_try(&image),
-            crate::ProcessingModes::Gpu => self.run_gpu(&image),
-            crate::ProcessingModes::CpuSimple => cpu::simple(
+            ProcessingModes::Try => self.run_try(&image),
+            ProcessingModes::Gpu => self.run_gpu(&image),
+            ProcessingModes::CpuSimple => cpu::simple(
                 &image,
                 self.input_width,
                 self.input_height,
                 self.output_width,
                 self.output_height,
             ),
-            crate::ProcessingModes::CpuFull => todo!(),
+            ProcessingModes::CpuFull => todo!(),
         };
 
         if let Err(e) = data {

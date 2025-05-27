@@ -1,5 +1,5 @@
 [package]
-name = "aar"
+name = "aar_lib"
 version = "0.1.0"
 edition = "2024"
 
@@ -17,17 +17,9 @@ panic = "abort"
 # [unstable]
 # build-std = ["std", "panic_abort"]
 # build-std-features = ["panic_immediate_abort"]
-[[bench]]
-name = "bench"
-harness = false
-
-[dev-dependencies]
-criterion = "0.5.1"
 
 [dependencies]
 bytemuck = "1.18.0"
-clap = { version = "4.4.18", features = ["derive"] }
-crossterm = "0.28.1"
 ctrlc = "3.4.5"
 flume = "0.11.0"
 image = "0.24.8"

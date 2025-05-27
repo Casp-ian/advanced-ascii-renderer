@@ -6,18 +6,18 @@ use std::{
 
 use image::{DynamicImage, io::Reader};
 
-use crate::{Args, MediaModes};
+use crate::{config::Config, config::MediaModes};
 
 pub const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
 
 // NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
 // so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now, and can be changed later
 pub struct FrameGrabber<'a> {
-    args: &'a Args,
+    args: &'a Config,
     start_time: Instant,
 }
 impl<'b> FrameGrabber<'b> {
-    pub fn new<'a>(args: &'a Args) -> Result<FrameGrabber<'a>, String> {
+    pub fn new<'a>(args: &'a Config) -> Result<FrameGrabber<'a>, String> {
         let start_time = Instant::now();
 
         if args.volume > 0 {
