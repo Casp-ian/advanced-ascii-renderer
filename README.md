@@ -66,6 +66,7 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - show your webcam
 
 ## todo (in order)
+- upper half block unicode character, with background character color
 - see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
 - make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge

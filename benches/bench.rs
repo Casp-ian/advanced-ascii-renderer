@@ -1,5 +1,5 @@
 use aar::{cli::Args, video::FrameGrabber};
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 fn grab_video_frames(c: &mut Criterion) {
     let mut group = c.benchmark_group("frames");
