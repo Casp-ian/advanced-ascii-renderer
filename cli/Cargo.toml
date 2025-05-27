@@ -5,4 +5,6 @@ edition = "2024"
 
 [dependencies]
 aar_lib = { path = "../lib" }
+clap = { version = "4.5.38", features = ["derive"] }
 crossterm = "0.29.0"
+ctrlc = "3.4.7"
