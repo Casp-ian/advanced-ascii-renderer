@@ -5,7 +5,7 @@ const LINES: &'static str = "linePieces.png";
 pub fn get_line_pieces() -> image::ImageBuffer<Luma<u8>, Vec<u8>> {
     let reader_result = Reader::open(LINES);
     if reader_result.is_err() {
-        panic!();
+        panic!("Line pieces image is missing");
     }
     let img_result = reader_result.unwrap().decode();
 

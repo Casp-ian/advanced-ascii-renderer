@@ -98,3 +98,26 @@ pub enum CharSet {
     Numbers,
     Discord,
 }
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            path: "".into(),
+            width: 10,
+            height: 10,
+            color: ColorSet::default(),
+            set: CharSet::default(),
+            quality: 5,
+            volume: 0,
+            format: None,
+            inverted: false,
+            threshold: 8.0,
+            no_lines: false,
+            only_lines: false,
+            char_width: 9,
+            char_height: 20,
+            media_mode: MediaModes::default(),
+            processing_mode: ProcessingModes::default(),
+        }
+    }
+}
