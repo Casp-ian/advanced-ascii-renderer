@@ -1,4 +1,4 @@
-use image::{DynamicImage, GenericImageView, Luma, Rgb};
+use image::{DynamicImage, Luma, Rgb};
 use lines::get_line_pieces;
 use pollster::FutureExt;
 
@@ -12,7 +12,6 @@ use self::gpu::WgpuContext;
 use self::text::translate_to_text;
 use self::types::*;
 use crate::Args;
-use crate::terminal::get_cols_and_rows;
 
 pub struct Textifier<'a> {
     args: &'a Args,
@@ -24,44 +23,23 @@ pub struct Textifier<'a> {
     gpu: Option<WgpuContext>,
 }
 impl<'b> Textifier<'b> {
-    pub fn new<'a>(args: &'a Args) -> Textifier<'a> {
+    pub fn new<'a>(
+        args: &'a Args,
+        input_width: u32,
+        input_height: u32,
+        output_width: u32,
+        output_height: u32,
+    ) -> Textifier<'a> {
         // process character magic
         return Textifier {
             args,
             abandon_gpu: false,
             gpu: None,
-            input_width: 0, // we are treating 0 as None in this case, so we dont have to call unwrap on everything
-            input_height: 0,
-            output_width: 0,
-            output_height: 0,
+            input_width,
+            input_height,
+            output_width,
+            output_height,
         };
-    }
-
-    fn setup_dimensions(&mut self, image: &DynamicImage) {
-        // return if they are already set
-        // im using 0 as unset because i dont want to have to .unwrap() every time
-        if self.input_width != 0 {
-            return;
-        }
-
-        let (image_width, image_height) = image.dimensions();
-        let (columns, rows) = get_cols_and_rows(
-            self.args.char_width,
-            self.args.char_height,
-            self.args.width,
-            self.args.height,
-            image_width,
-            image_height,
-        );
-
-        if image_width == 0 || image_height == 0 || columns == 0 || rows == 0 {
-            panic!("calculating dimensions failed, none of the values should be zero");
-        }
-
-        self.input_width = image_width;
-        self.input_height = image_height;
-        self.output_width = columns;
-        self.output_height = rows;
     }
 
     fn setup_gpu(
@@ -92,6 +70,16 @@ impl<'b> Textifier<'b> {
         }
     }
 
+    fn run_cpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
+        return cpu::simple(
+            &image,
+            self.input_width,
+            self.input_height,
+            self.output_width,
+            self.output_height,
+        );
+    }
+
     fn run_gpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
         if self.gpu.is_none() {
             self.setup_gpu(
@@ -102,6 +90,7 @@ impl<'b> Textifier<'b> {
                 get_line_pieces(),
             )?;
         }
+
         let gpu = self.gpu.as_ref().unwrap();
 
         // maybe this should be moved to gpu module?
@@ -130,14 +119,9 @@ impl<'b> Textifier<'b> {
 
     fn run_try(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
         if self.abandon_gpu {
-            return cpu::simple(
-                image,
-                self.input_width,
-                self.input_height,
-                self.output_width,
-                self.output_height,
-            );
+            return self.run_cpu(image);
         }
+
         let data = self.run_gpu(image);
         if data.is_err() {
             eprintln!(
@@ -145,32 +129,18 @@ impl<'b> Textifier<'b> {
                 "gpu failed, running as cpu_simple, cpu_full is not yet implemented"
             );
             self.abandon_gpu = true;
-            return cpu::simple(
-                image,
-                self.input_width,
-                self.input_height,
-                self.output_width,
-                self.output_height,
-            );
+            return self.run_cpu(image);
         }
         return data;
     }
 
     pub fn to_text(&mut self, image: DynamicImage) -> Result<String, String> {
-        self.setup_dimensions(&image);
-
         let data: Result<Vec<Vec<PixelData>>, String>;
         data = match self.args.processing_mode {
-            crate::ProcessingModes::Try => self.run_try(&image),
-            crate::ProcessingModes::Gpu => self.run_gpu(&image),
-            crate::ProcessingModes::CpuSimple => cpu::simple(
-                &image,
-                self.input_width,
-                self.input_height,
-                self.output_width,
-                self.output_height,
-            ),
-            crate::ProcessingModes::CpuFull => todo!(),
+            None => self.run_try(&image),
+            Some(crate::ProcessingModes::Gpu) => self.run_gpu(&image),
+            Some(crate::ProcessingModes::CpuSimple) => self.run_gpu(&image),
+            Some(crate::ProcessingModes::CpuFull) => todo!(),
         };
 
         if let Err(e) = data {

@@ -1,12 +1,10 @@
-use std::{
-    fs::remove_file,
-    process::{Command, Output},
-    time::Instant,
-};
+use std::{fs::remove_file, time::Instant};
 
 use image::{DynamicImage, io::Reader};
 
 use crate::{Args, MediaModes};
+
+use crate::ffutils;
 
 pub const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.png";
 
@@ -22,43 +20,26 @@ impl<'b> FrameGrabber<'b> {
 
         if args.volume > 0 {
             // start audio sub-process
-            Command::new("ffplay")
-                .args([args.path.to_str().unwrap()])
-                .args(["-nodisp"])
-                .args(["-autoexit"])
-                .args(["-v", "quiet"])
-                .args(["-volume", &args.volume.to_string()])
-                .spawn()
-                .expect("audio broke");
+            ffutils::play_audio(&args.path, args.volume);
         }
 
         return Ok(FrameGrabber { args, start_time });
     }
 
     pub fn grab(&self) -> Option<Result<DynamicImage, String>> {
-        let command_result: std::io::Result<Output>;
+        // Dont do time if stream mode
+        let time: Option<f32> = match self.args.media_mode {
+            Some(MediaModes::Stream) => None,
+            _ => Some(self.start_time.elapsed().as_secs_f32()),
+        };
 
-        let mut command = &mut Command::new("ffmpeg");
-        command = command.arg("-y");
-
-        if let Some(format) = &self.args.format {
-            command = command.args(["-f", format.as_str()]);
-        }
-
-        if self.args.media_mode != MediaModes::Stream {
-            command = command.args([
-                "-ss",
-                self.start_time.elapsed().as_secs_f32().to_string().as_str(),
-            ]);
-        }
-
-        command = command
-            .args(["-i", &self.args.path.to_str().unwrap()])
-            .args(["-q:v", &self.args.quality.to_string()])
-            .args(["-frames:v", "1"])
-            .arg(TEMPORARY_IMAGE_FILE_NAME);
-
-        command_result = command.output();
+        let command_result = ffutils::get_frame_at(
+            time,
+            &self.args.path,
+            &self.args.quality,
+            &self.args.format,
+            TEMPORARY_IMAGE_FILE_NAME,
+        );
 
         match command_result {
             Err(e) => return Some(Err(e.to_string())),

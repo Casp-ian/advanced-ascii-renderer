@@ -63,34 +63,25 @@ pub struct Args {
     pub char_height: u32,
 
     /// choose how to read the file
-    #[arg(long, default_value_t, value_enum)]
-    pub media_mode: MediaModes,
+    #[arg(long, value_enum)]
+    pub media_mode: Option<MediaModes>,
 
     /// choose wether to use gpu or cpu
-    #[arg(long, default_value_t, value_enum)]
-    pub processing_mode: ProcessingModes,
+    #[arg(long, value_enum)]
+    pub processing_mode: Option<ProcessingModes>,
 }
 
-#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
 pub enum MediaModes {
-    #[default]
-    /// try image and then video if image fails
-    Try,
     Image,
     /// textify frames as fast as it can, requires ffmpeg
     Video,
     /// just like video but for things like your webcam that dont have a set duration
     Stream,
-    // TODO
-    // /// just like video but wait for the entire thing to be rendered at a flat framerate before displaying
-    // VideoPrerender,
 }
 
-#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
 pub enum ProcessingModes {
-    #[default]
-    /// try gpu and then cpu simple if gpu fails
-    Try,
     Gpu,
     /// runs on cpu but with less features than gpu
     CpuSimple,
@@ -102,7 +93,7 @@ pub enum ProcessingModes {
 pub enum ColorSet {
     #[default]
     None,
-    All,
+    RGB,
 }
 
 // The actual arrays of characters used for the character sets could be stored inside this enum, but i dont think it really matters

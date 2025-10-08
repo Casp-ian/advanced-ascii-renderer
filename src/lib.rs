@@ -5,16 +5,20 @@ use cli::*;
 
 pub mod video;
 
+pub mod ffutils;
+
 pub mod terminal;
 
 pub mod textifier;
 use textifier::Textifier;
 
 pub fn run(args: &Args) -> Result<(), String> {
+    println!("{:?}", ffutils::get_meta(&args.path));
+
     let result: Result<(), String> = match args.media_mode {
-        MediaModes::Try => try_them_all(args),
-        MediaModes::Image => do_image_stuff(args),
-        MediaModes::Video | MediaModes::Stream => do_video_stuff(args),
+        None => try_them_all(args),
+        Some(MediaModes::Image) => do_image_stuff(args),
+        Some(MediaModes::Video) | Some(MediaModes::Stream) => do_video_stuff(args),
     };
     return result;
 }
@@ -37,6 +41,24 @@ fn try_them_all(args: &Args) -> Result<(), String> {
     }
 }
 
+fn calculate_dimensions(args: &Args) -> (u32, u32, u32, u32) {
+    // TODO improve error handling
+    let meta = ffutils::get_meta(&args.path).expect("Image not found");
+
+    let image_width = meta.0;
+    let image_height = meta.1;
+    let (columns, rows) = terminal::get_cols_and_rows(
+        args.char_width,
+        args.char_height,
+        args.width,
+        args.height,
+        image_width,
+        image_height,
+    );
+
+    return (image_width, image_height, columns, rows);
+}
+
 fn do_image_stuff(args: &Args) -> Result<(), String> {
     let reader_result = Reader::open(&args.path);
     if reader_result.is_err() {
@@ -45,8 +67,9 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
-        let mut thing = Textifier::new(&args);
-        print!("{}", thing.to_text(image)?);
+        let (in_width, in_height, out_width, out_height) = calculate_dimensions(&args);
+        let mut textifier = Textifier::new(&args, in_width, in_height, out_width, out_height);
+        print!("{}", textifier.to_text(image)?);
 
         // clear ansi color code
         println!("\x1b[0m");
@@ -58,7 +81,8 @@ fn do_image_stuff(args: &Args) -> Result<(), String> {
 }
 
 fn do_video_stuff(args: &Args) -> Result<(), String> {
-    let mut textifier = Textifier::new(&args);
+    let (in_width, in_height, out_width, out_height) = calculate_dimensions(&args);
+    let mut textifier = Textifier::new(&args, in_width, in_height, out_width, out_height);
 
     let video_frame_grabber = video::FrameGrabber::new(args).unwrap();
 

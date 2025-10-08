@@ -51,7 +51,7 @@ pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 3]) -> String {
     // TODO get some info on where the ansi codes work and dont
     // TODO this also needs to change for other color modes like html
     // TODO also color quantization, but that should happen in shader.wgsl
-    if color_set == &ColorSet::All {
+    if color_set == &ColorSet::RGB {
         return format!("\x1b[38;2;{};{};{}m", color[0], color[1], color[2]).to_string();
     } else {
         return "".to_string();
