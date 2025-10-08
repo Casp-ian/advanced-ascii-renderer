@@ -65,12 +65,13 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - play video (with audio)
 - show your webcam
 
-## todo (in order)
-- upper half block unicode character, with background character color
+## todo (in rough order)
 - see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
-- make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
+- upper half block unicode character, with background character color
+- make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
 - improve color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
 - maybe a option to enable a dithering effect?? (both in color and in character seperately)
-- adjustable line 'thickness'
-- on cpu backup mode for if the user doenst have a GPU
+- adjustable line 'thickness' and other parameters
+- on full cpu backup mode for if the user doenst have a GPU
+- recognizing text and making that visible

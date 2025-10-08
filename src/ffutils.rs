@@ -1,6 +1,9 @@
-use std::process::{Command, ExitStatus};
+use std::process::Command;
 
-// TODO fix up into seperate functions for streaming maybe
+// TODO
+// Problems with this:
+// - its slow, restarting ffmpeg cli every frame
+// - kinda weird time being an option
 pub fn get_frame_at(
     time: Option<f32>,
     file_name: &std::path::PathBuf,
@@ -42,7 +45,7 @@ pub fn play_audio(file_name: &std::path::PathBuf, volume: u8) {
         .expect("audio broke");
 }
 
-// TODO use meta for terminal and such
+// TODO should just create a struct for this
 pub fn get_meta(file_name: &std::path::PathBuf) -> Option<(u32, u32, Option<f32>, Option<u32>)> {
     let output: std::process::Output = Command::new("ffprobe")
         .args([file_name.to_str().unwrap()])

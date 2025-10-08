@@ -14,5 +14,5 @@ pub fn get_line_pieces() -> image::ImageBuffer<Luma<u8>, Vec<u8>> {
         return luma;
     }
 
-    panic!();
+    panic!("linepieces image is gone");
 }
