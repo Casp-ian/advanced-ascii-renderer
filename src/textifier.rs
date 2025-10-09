@@ -15,11 +15,11 @@ use crate::Args;
 
 pub struct Textifier<'a> {
     args: &'a Args,
-    abandon_gpu: bool,
     input_width: u32,
     input_height: u32,
     output_width: u32,
     output_height: u32,
+    abandon_gpu: bool,
     gpu: Option<WgpuContext>,
 }
 impl<'b> Textifier<'b> {
@@ -30,7 +30,6 @@ impl<'b> Textifier<'b> {
         output_width: u32,
         output_height: u32,
     ) -> Textifier<'a> {
-        // process character magic
         return Textifier {
             args,
             abandon_gpu: false,

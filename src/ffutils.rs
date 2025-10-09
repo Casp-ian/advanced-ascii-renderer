@@ -1,5 +1,8 @@
 use std::process::Command;
 
+// NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
+// so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now, and can be changed later
+
 // TODO
 // Problems with this:
 // - its slow, restarting ffmpeg cli every frame
@@ -45,7 +48,7 @@ pub fn play_audio(file_name: &std::path::PathBuf, volume: u8) {
         .expect("audio broke");
 }
 
-// TODO should just create a struct for this
+// TODO should just create a struct for this return
 pub fn get_meta(file_name: &std::path::PathBuf) -> Option<(u32, u32, Option<f32>, Option<u32>)> {
     let output: std::process::Output = Command::new("ffprobe")
         .args([file_name.to_str().unwrap()])
@@ -60,19 +63,23 @@ pub fn get_meta(file_name: &std::path::PathBuf) -> Option<(u32, u32, Option<f32>
         return None;
     }
 
+    if output.stdout.is_empty() {
+        return None;
+    }
+
     let stdout = str::from_utf8(&output.stdout).unwrap();
 
-    let test: Vec<&str> = stdout
+    let meta_string: Vec<&str> = stdout
         .trim_end_matches(&['\r', '\n']) // trim newline for windows and linux
         .split(',')
         .collect();
 
-    let width: u32 = test[0].parse().unwrap();
-    let height: u32 = test[1].parse().unwrap();
+    let width: u32 = meta_string[0].parse().unwrap();
+    let height: u32 = meta_string[1].parse().unwrap();
 
     // could have cleaner way of accounting for n/a
-    let duration: Option<f32> = test[2].parse().ok();
-    let frames: Option<u32> = test[3].parse().ok();
+    let duration: Option<f32> = meta_string[2].parse().ok();
+    let frames: Option<u32> = meta_string[3].parse().ok();
 
     return Some((width, height, duration, frames));
 }
