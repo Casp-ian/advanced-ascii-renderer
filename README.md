@@ -75,3 +75,4 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - adjustable line 'thickness' and other parameters
 - on full cpu backup mode for if the user doenst have a GPU
 - recognizing text and making that visible
+- resizing on terminal resize

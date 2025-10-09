@@ -1,5 +1,8 @@
 use image::{Luma, Rgba};
-use wgpu::util::{BufferInitDescriptor, DeviceExt};
+use wgpu::{
+    ExperimentalFeatures,
+    util::{BufferInitDescriptor, DeviceExt},
+};
 
 pub struct WgpuContext {
     device: wgpu::Device,
@@ -38,15 +41,14 @@ impl WgpuContext {
             .await
             .unwrap();
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::downlevel_defaults(),
-                    memory_hints: wgpu::MemoryHints::Performance,
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                experimental_features: ExperimentalFeatures::disabled(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .unwrap();
 
@@ -310,8 +312,9 @@ impl WgpuContext {
 
         // Wait for the GPU to finish working on the submitted work. This doesn't work on WebGPU, so we would need
         // to rely on the callback to know when the buffer is mapped.
-        self.device.poll(wgpu::Maintain::wait()).panic_on_timeout();
-        // self.device.poll(wgpu::PollType::Wait).unwrap();
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .unwrap();
 
         // We can now read the data from the buffer.
         let data = buffer_slice.get_mapped_range();
