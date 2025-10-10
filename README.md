@@ -61,15 +61,15 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - character sets, current options braile, numbers and ascii
 - changing the width and height, if one is not given the other is calculated to try and match aspect ratio of image
 - edge detection using the sobel operator
-- color (use the 'real' color set)
+- ansi rgb color (use the 'rgb' color set)
 - play video (with audio)
 - show your webcam
 
 ## todo (in rough order)
 - see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
-- upper half block unicode character, with background character color
 - make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
+- upper half block unicode character, with background character color
 - improve color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
 - maybe a option to enable a dithering effect?? (both in color and in character seperately)
 - adjustable line 'thickness' and other parameters

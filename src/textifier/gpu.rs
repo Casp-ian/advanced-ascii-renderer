@@ -272,7 +272,6 @@ impl WgpuContext {
             compute_pass.insert_debug_marker("edges");
 
             compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
-            compute_pass.dispatch_workgroups(self.input_width, self.input_height, 1);
         }
 
         {

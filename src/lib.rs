@@ -1,4 +1,4 @@
-use image::io::Reader;
+use image::ImageReader;
 
 pub mod cli;
 use cli::*;
@@ -13,7 +13,7 @@ pub mod textifier;
 use textifier::Textifier;
 
 pub fn run(args: &Args) -> Result<(), String> {
-    let (img_width, img_height, duration, frames) = match ffutils::get_meta(&args.path) {
+    let (img_width, img_height, _, frames) = match ffutils::get_meta(&args.path) {
         None => return Err(format!("no valid image or video found at {:?}", args.path).to_string()),
         Some(x) => x,
     };
@@ -52,8 +52,8 @@ fn calculate_dimensions(args: &Args, image_width: u32, image_height: u32) -> (u3
     return (columns, rows);
 }
 
-fn do_image_stuff(args: &Args, textifier: &mut Textifier, rows: &u32) -> Result<(), String> {
-    let reader_result = Reader::open(&args.path);
+fn do_image_stuff(args: &Args, textifier: &mut Textifier, _: &u32) -> Result<(), String> {
+    let reader_result = ImageReader::open(&args.path);
     if reader_result.is_err() {
         return Err("Cannot find file".to_string());
     }

@@ -1,6 +1,6 @@
 use std::{fs::remove_file, time::Instant};
 
-use image::{DynamicImage, io::Reader};
+use image::{DynamicImage, ImageReader};
 
 use crate::{Args, MediaModes};
 
@@ -50,7 +50,7 @@ impl<'a> Iterator for FrameGrabber<'a> {
                 return None;
             }
             Ok(_) => {
-                let reader_result = Reader::open(TEMPORARY_IMAGE_FILE_NAME);
+                let reader_result = ImageReader::open(TEMPORARY_IMAGE_FILE_NAME);
                 if let Err(e) = reader_result {
                     // probably would happen if the ffmpeg function failed, but then we would have stopped this earlier, so should never happen, TODO
                     eprintln!("{}", e.to_string());
