@@ -92,28 +92,7 @@ impl<'b> Textifier<'b> {
 
         let gpu = self.gpu.as_ref().unwrap();
 
-        // maybe this should be moved to gpu module?
-        let raw_data = gpu.process(image.to_rgba8()).block_on()?;
-
-        let single_vec_data: Vec<PixelData> = raw_data
-            .chunks_exact(3)
-            .map(|x| PixelData {
-                direction: Direction::from_int(bytemuck::cast(x[0])),
-                color: Rgb([
-                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[0],
-                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[1],
-                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[2],
-                ]),
-                brightness: x[2],
-            })
-            .collect();
-
-        let data = single_vec_data
-            .chunks(self.output_width as usize)
-            .map(|x| x.to_vec())
-            .collect::<Vec<Vec<PixelData>>>();
-
-        return Ok(data);
+        return gpu.process(image.to_rgba8()).block_on();
     }
 
     fn run_try(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {

@@ -1,8 +1,10 @@
-use image::{Luma, Rgba};
+use image::{Luma, Rgb, Rgba};
 use wgpu::{
     ExperimentalFeatures,
     util::{BufferInitDescriptor, DeviceExt},
 };
+
+use crate::textifier::types::{Direction, PixelData};
 
 pub struct WgpuContext {
     device: wgpu::Device,
@@ -251,7 +253,7 @@ impl WgpuContext {
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
-    ) -> Result<Vec<f32>, String> {
+    ) -> Result<Vec<Vec<PixelData>>, String> {
         // will get the image to the gpu
         self.queue
             .write_buffer(&self.input_buffer, 0, input_image.as_raw());
@@ -319,11 +321,29 @@ impl WgpuContext {
         let data = buffer_slice.get_mapped_range();
 
         // Convert the data back to a slice of f32.
-        let result: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
+        let raw_result: Vec<f32> = bytemuck::cast_slice(&data).to_vec();
 
         // Unmaps buffer from memory
         drop(data);
         self.output_staging_buffer.unmap();
+
+        let single_vec_data: Vec<PixelData> = raw_result
+            .chunks_exact(3)
+            .map(|x| PixelData {
+                direction: Direction::from_int(bytemuck::cast(x[0])),
+                color: Rgb([
+                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[0],
+                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[1],
+                    bytemuck::cast_slice::<f32, u8>(&[x[1]])[2],
+                ]),
+                brightness: x[2],
+            })
+            .collect();
+
+        let result = single_vec_data
+            .chunks(self.output_width as usize)
+            .map(|x| x.to_vec())
+            .collect::<Vec<Vec<PixelData>>>();
 
         // Print out the result.
         return Ok(result);
