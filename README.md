@@ -63,7 +63,7 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - edge detection using the sobel operator
 - ansi rgb color (use the 'rgb' color set)
 - play video (with audio)
-- show your webcam
+- show your webcam (on linux with `aar /dev/video0 --format v4l2 --media-mode stream`)
 
 ## todo (in rough order)
 - see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
