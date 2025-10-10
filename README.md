@@ -5,6 +5,8 @@ This is a command line tool that will turn an image or video into ascii or other
 
 With edge detection and gpu acceleration as "advanced" features.
 
+For a significant part inspired by [this video by acerola](https://www.youtube.com/watch?v=gg40RWiaHRY)
+
 Usecases could include:
 - Needing to get an idea of what an image contains when in an enviorment where you only have the terminal like when you are ssh'd into a machine.
 - Sending low resolution images in Discord servers where you dont have image permisions.
@@ -66,13 +68,14 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
 - show your webcam (on linux with `aar /dev/video0 --format v4l2 --media-mode stream`)
 
 ## todo (in rough order)
-- see if i can improve the line detection further [like done in this cool video](https://www.youtube.com/watch?v=gg40RWiaHRY)
+- re add sobel edge directions as well
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
 - make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
+- improve video file intake performance (probably just downscaling the frame)
 - upper half block unicode character, with background character color
 - improve color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
-- maybe a option to enable a dithering effect?? (both in color and in character seperately)
 - adjustable line 'thickness' and other parameters
+- loop video
 - on full cpu backup mode for if the user doenst have a GPU
 - recognizing text and making that visible
 - resizing on terminal resize

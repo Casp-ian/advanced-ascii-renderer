@@ -249,7 +249,6 @@ impl WgpuContext {
         });
     }
 
-    // NOTE this functions return type isnt really representative, most of the values will be reinterpreted into something other than f32
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
@@ -327,6 +326,7 @@ impl WgpuContext {
         drop(data);
         self.output_staging_buffer.unmap();
 
+        // Cast bytes to correct type
         let single_vec_data: Vec<PixelData> = raw_result
             .chunks_exact(3)
             .map(|x| PixelData {
@@ -345,7 +345,6 @@ impl WgpuContext {
             .map(|x| x.to_vec())
             .collect::<Vec<Vec<PixelData>>>();
 
-        // Print out the result.
         return Ok(result);
     }
 }

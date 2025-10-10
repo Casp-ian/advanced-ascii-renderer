@@ -1,4 +1,4 @@
-use image::{DynamicImage, Luma, Rgb};
+use image::{DynamicImage, Luma};
 use lines::get_line_pieces;
 use pollster::FutureExt;
 
