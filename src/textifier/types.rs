@@ -9,6 +9,14 @@ pub struct PixelData {
     pub color: Rgb<u8>,
 }
 
+// struct test
+// pub char: Char,
+// pub color1: Option<Rgb<u8>>,
+// pub color2: Option<Rgb<u8>>,
+//
+//
+//
+
 #[derive(Clone, Debug, Copy)]
 pub enum Direction {
     None,

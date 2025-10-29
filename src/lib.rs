@@ -18,6 +18,8 @@ pub fn run(args: &Args) -> Result<(), String> {
         Some(x) => x,
     };
 
+    // let (img_width, img_height) = (256, 144);
+
     let (cols, rows) = calculate_dimensions(args, img_width, img_height);
 
     let mut textifier = Textifier::new(&args, img_width, img_height, cols, rows);

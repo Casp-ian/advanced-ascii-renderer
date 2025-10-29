@@ -216,14 +216,14 @@ impl WgpuContext {
                     }),
                 },
                 // lines
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &line_buffer,
-                        offset: 0,
-                        size: None,
-                    }),
-                },
+                // wgpu::BindGroupEntry {
+                //     binding: 4,
+                //     resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                //         buffer: &line_buffer,
+                //         offset: 0,
+                //         size: None,
+                //     }),
+                // },
             ],
         });
 

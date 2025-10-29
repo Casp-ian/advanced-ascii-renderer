@@ -40,8 +40,8 @@ pub struct Args {
     #[arg(long)]
     pub inverted: bool,
 
-    /// from -64 to 64, this is the threshold for how close a line needs to be to count
-    #[arg(long, default_value_t = 8.0)]
+    /// from 0 to 1, this is the threshold for how clear of an edge something has to be
+    #[arg(long, default_value_t = 0.5)]
     pub threshold: f32,
 
     /// remove the lines characters like /-\|

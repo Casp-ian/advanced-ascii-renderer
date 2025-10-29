@@ -15,7 +15,7 @@ Usecases could include:
 ## example 
 The primeagens profile picture
 ```
-$ imageToText ~/Pictures/prime.jpeg --set ascii --height 80
+$ imageToText ~/Pictures/prime.jpeg --set ascii --height 40
 
 """""""""""""|oooooooooooooooooooooooooooooooooooooooooooooooo|"""""""""""""""""
 """"""""""""""ooooooooooooooooooooooooooooooooooooooooooooooo|""""""""""""""""""

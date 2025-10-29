@@ -8,17 +8,11 @@ var<storage, read_write> inputTexture: array<u32>; // packed u8 color values
 
 @group(0)
 @binding(2)
-var<storage, read_write> intermediateBuffer: array<IntermediateData>;
+var<storage, read_write> intermediateBuffer: array<u32>; // packed f16 magnitude and angle
 
 @group(0)
 @binding(3)
 var<storage, read_write> outputBuffer: array<PixelData>;
-
-@group(0)
-@binding(4)
-// 5 char * 4 vecs per char
-// this will always be accessed through linePiecePixel();
-var<uniform> lineBuffer: array<vec4<u32>, 20>;
 
 struct ConfigData {
     inputWidth: u32,
@@ -28,21 +22,10 @@ struct ConfigData {
     threshold: f32,
 }
 
-struct IntermediateData {
-    edge: f32,
-}
-
 struct PixelData {
     direction: u32,
     color: u32,
     brightness: f32,
-}
-
-fn linePiecePixel(i: u32, x: u32, y: u32) -> f32 {
-    let a: u32 = (i * 4) + (y / 2);
-    let b: u32 = (y % 2) + (x / 4);
-    let c: u32 = x % 4;
-    return unpack4x8unorm(lineBuffer[a][b])[c];
 }
 
 fn coordsInput(x: u32, y: u32) -> u32 {
@@ -71,14 +54,12 @@ fn mdot(left: mat3x3<f32>, right: mat3x3<f32>) -> f32 {
 fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // cant do edge detection on the outer edges of the image
     if (global_id.x == 0) || (global_id.y == 0) || (global_id.x >= config.inputWidth - 1) || (global_id.y >= config.inputHeight - 1) {
-        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(0);
+        intermediateBuffer[coordsInput(global_id.x, global_id.y)] = pack2x16float(vec2f(0, 0));
         return;
     }
 
     // NOTE: there is a small advantage to splitting edge detection to collors instead of grayscaling, i think stevehanov just picked bad examples to show it off
     // source: https://stevehanov.ca/blog/?id=62
-
-    // TODO make edge detection size scale with proportion to output size
 
     let stepX = 1u + u32(floor((f32(config.inputWidth) / f32(config.outputWidth)) / 6.0)); // magic number for now
     let stepY = 1u + u32(floor((f32(config.inputHeight) / f32(config.outputHeight)) / 6.0)); // magic number for now
@@ -86,21 +67,17 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     // let stepY = 1u;
 
     let kernel = mat3x3f(
-        vec3f(
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y - stepY )] )),
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y - stepY )] )),
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y - stepY )] )),
-        ),
-        vec3f(
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + 0     )] )),
-            0.0,
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + 0     )] )),
-        ),
-        vec3f(
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + stepY )] )),
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y + stepY )] )),
-            brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + stepY )] )),
-        )
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y - stepY )] )),
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y - stepY )] )),
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y - stepY )] )),
+        
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + 0     )] )),
+        0.0, // we could sample this, but for sobel it wont be used anyways
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + 0     )] )),
+        
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + stepY )] )),
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y + stepY )] )),
+        brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + stepY )] )),
     );
     
     let sobelX = mat3x3f(
@@ -118,62 +95,53 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var gy: f32 = mdot(kernel, sobelY);
 
     var magnitude: f32 = sqrt(gx * gx + gy * gy);
+    var angle: f32 = atan2(gx, gy);
 
-    intermediateBuffer[coordsInput(global_id.x, global_id.y)] = IntermediateData(magnitude);
+    var data = pack2x16float(vec2f(magnitude, angle));
+
+    intermediateBuffer[coordsInput(global_id.x, global_id.y)] = data;
 }
 
 @compute
 @workgroup_size(1)
 fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    // square of pixels to take into account when downscaling
-
-    let chunkX: f32 = f32(config.inputWidth) / f32(config.outputWidth + 1);
-    let offsetX: f32 = chunkX * f32(global_id.x);
-    let chunkletX: f32 = chunkX / 8.0;
-
-    let chunkY: f32 = f32(config.inputHeight) / f32(config.outputHeight + 1);
-    let offsetY: f32 = chunkY * f32(global_id.y);
-    let chunkletY: f32 = chunkY / 8.0;
-    
     let XL = global_id.x * config.inputWidth / (config.outputWidth + 1);
     let YL = global_id.y * config.inputHeight / (config.outputHeight + 1);
     let XR = ((global_id.x + 1) * config.inputWidth / (config.outputWidth + 1)) - 1;
     let YR = ((global_id.y + 1) * config.inputHeight / (config.outputHeight + 1)) - 1;
-
-    var scores: array<f32, 5> = array(0.0, 0.0, 0.0, 0.0, 0.0);
-
-    for (var y: u32 = 0; y < 8; y++) {
-        let lineY: u32 = u32( offsetY + (chunkletY * f32(y)) );
-
-        for (var x: u32 = 0; x < 8; x++) {
-            let lineX: u32 = u32( offsetX + (chunkletX * f32(x)) );
-            
-            let edge: f32 = (intermediateBuffer[coordsInput(lineX, lineY)].edge - 0.5) * 2.0;
-
-            for (var i: u32 = 0u; i < 5u; i++) {
-                let edgeScore: f32 = (linePiecePixel(i, x, y) - 0.5) * 2.0;
-
-                scores[i] += edge * edgeScore;
-            }
-        }
-    }
-    
-    // score is +1.0 for every edge both in linepiece and edges
-    // score is -1.0 for every edge that is not in linepiece but in edges
-    // score is 0.0 for every edge that is half in linepiece but in edges
-    var threshold: f32 = config.threshold;
-    // var threshold: f32 = 1.0;
-    var direction: u32 = 0u;
-    
-    for (var i: u32 = 0u; i < 5u; i++) {
-        if (scores[i] > threshold) {
-            direction = i + 1;
-            threshold = scores[i];
-        }
-    }
-    
     let XC = (XL + XR) / 2;
     let YC = (YL + YR) / 2;
+
+    let test = unpack2x16float(intermediateBuffer[coordsInput(XC, YC)]);
+    let magnitude = test[0];
+    let angle = test[1];
+
+    let PI: f32 = 3.14159;
+    
+    let threshold: f32 = config.threshold;
+    // var threshold: f32 = 1.0;
+    var direction: u32 = 0u;
+
+    // TODO improve by taking entire chunk
+
+    if (magnitude > threshold) {
+        if (angle < (2.0 * PI / 3.0) && angle > (PI / 3.0)) || (angle < (-2.0 * PI / 3.0) && angle > (-1.0 * PI / 3.0)) {
+            direction = 4;
+            // return "-";
+        }
+        if ((angle < PI / 6.0) && (angle > -1.0 * PI / 6.0)) || ((angle > 5.0 * PI / 6.0) || (angle < -5.0 * PI / 6.0)) {
+            direction = 3;
+            // return "|";
+        }
+        if ((angle > PI / 6.0) && (angle < PI / 3.0)) || ((angle > -5.0 * PI / 6.0) && (angle < -2.0 * PI / 3.0)) {
+            direction = 1;
+            // return "/";
+        }
+        if ((angle < -1.0 * PI / 6.0) && (angle > -1.0 * PI / 3.0)) || ((angle < 5.0 * PI / 6.0) && (angle > 2.0 * PI / 3.0)) {
+            direction = 2;
+            // return "\\";
+        }
+    }
     
     let packedColorPixel = inputTexture[coordsInput(XC, YC)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
