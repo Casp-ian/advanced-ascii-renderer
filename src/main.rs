@@ -1,11 +1,9 @@
 use aar::run;
-use std::{fs::remove_file, process::ExitCode};
+use std::process::ExitCode;
 
 use aar::cli::get_cli_args;
 
 fn do_before_exit() {
-    let _ = remove_file(aar::video::TEMPORARY_IMAGE_FILE_NAME);
-
     // TODO, this doesnt stop any of the other processes gracefully, so sometimes a error message gets shown at exit
     std::process::exit(0);
 }

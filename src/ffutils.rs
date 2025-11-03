@@ -1,18 +1,14 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 
-// NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and not have this specific usecase in mind
+// NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and do not have this specific usecase in mind
 // so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now, and can be changed later
 
-// TODO
-// Problems with this:
-// - its slow, restarting ffmpeg cli every frame
-// - kinda weird time being an option
-pub fn get_frame_at(
-    time: Option<f32>,
-    file_name: &std::path::PathBuf,
+pub fn start_getting_frames(
+    input_file: &std::path::PathBuf,
+    output_directory: &std::path::PathBuf,
     quality: &u8,
     format: &Option<String>,
-    output_name: &str,
+    do_fps: bool,
 ) -> Result<(), String> {
     let mut command = &mut Command::new("ffmpeg");
     command = command.arg("-y");
@@ -21,17 +17,25 @@ pub fn get_frame_at(
         command = command.args(["-f", format.as_str()]);
     }
 
-    if let Some(time) = time {
-        command = command.args(["-ss", time.to_string().as_str()]);
+    command = command
+        .args(["-readrate", "1.0"])
+        .args(["-i", input_file.to_str().unwrap()])
+        // .args(["-vf", "scale=-1:320"]) // NOTE also test equal scale
+        .args(["-q:v", &quality.to_string()]); // NOTE test if quality even does anything
+
+    if do_fps {
+        command = command.args(["-filter:v", "fps=60/1"]);
     }
 
-    command = command
-        .args(["-i", file_name.to_str().unwrap()])
-        .args(["-q:v", &quality.to_string()])
-        .args(["-frames:v", "1"])
-        .arg(output_name);
+    command = command.arg(output_directory.join("%05d.bmp"));
 
-    match command.output() {
+    // make sure output doesnt interupt our stdout
+    command = command
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .stdin(Stdio::null());
+
+    match command.spawn() {
         Ok(_) => return Ok(()),
         Err(e) => return Err(e.to_string()),
     }
