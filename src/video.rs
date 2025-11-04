@@ -35,13 +35,11 @@ impl<'b> FrameGrabber<'b> {
         }
 
         // TODO theoretically these could get out of sync if the surrounding code is too slow
-        let streaming = args.media_mode.is_some_and(|x| x == MediaModes::Stream);
         ffutils::start_getting_frames(
             &args.path,
             &output_dir,
             &args.quality,
-            &args.format,
-            streaming,
+            &args.format, //
         )?;
         if args.volume > 0 {
             // start audio sub-process
@@ -73,7 +71,7 @@ impl<'a> Iterator for FrameGrabber<'a> {
         loop {
             match ImageReader::open(&output_location) {
                 Err(e) if e.kind() == ErrorKind::NotFound => {
-                    eprintln!("counter {:0>5}, not yet here", &self.counter)
+                    // eprintln!("counter {:0>5}, not yet here", &self.counter)
                 } // it is already removed, we are happy
                 Ok(x) => {
                     match x.decode() {

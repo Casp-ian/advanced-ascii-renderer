@@ -14,13 +14,13 @@ use textifier::Textifier;
 
 pub fn run(args: &Args) -> Result<(), String> {
     let (img_width, img_height, _, frames) = match ffutils::get_meta(&args.path) {
-        None => return Err(format!("no valid image or video found at {:?}", args.path).to_string()),
-        Some(x) => x,
+        Err(e) => return Err(format!("{} for {:?}", e, args.path).to_string()),
+        Ok(x) => x,
     };
 
-    // let (img_width, img_height) = (256, 144);
-
     let (cols, rows) = calculate_dimensions(args, img_width, img_height);
+
+    let (img_width, img_height) = (144, 144);
 
     let mut textifier = Textifier::new(&args, img_width, img_height, cols, rows);
 

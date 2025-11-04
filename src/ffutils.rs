@@ -1,14 +1,15 @@
 use std::process::{Command, Stdio};
 
 // NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and do not have this specific usecase in mind
-// so we just run the ffmpeg command of the system, it might be terrible, but it does work nice for now, and can be changed later
+// so we just run the ffmpeg command of the system, can be changed later
+
+// note that right now there is technically some wasted work encoding and decoding the files (tho to .bmp, so should be very light) and writing to disk
 
 pub fn start_getting_frames(
     input_file: &std::path::PathBuf,
     output_directory: &std::path::PathBuf,
     quality: &u8,
     format: &Option<String>,
-    do_fps: bool,
 ) -> Result<(), String> {
     let mut command = &mut Command::new("ffmpeg");
     command = command.arg("-y");
@@ -20,14 +21,10 @@ pub fn start_getting_frames(
     command = command
         .args(["-readrate", "1.0"])
         .args(["-i", input_file.to_str().unwrap()])
-        // .args(["-vf", "scale=-1:320"]) // NOTE also test equal scale
-        .args(["-q:v", &quality.to_string()]); // NOTE test if quality even does anything
-
-    if do_fps {
-        command = command.args(["-filter:v", "fps=60/1"]);
-    }
-
-    command = command.arg(output_directory.join("%05d.bmp"));
+        .args(["-vf", "scale=144:144,fps=30/1"]) // NOTE also test scale
+        // .args(["-filter:v", "fps=3/1"])
+        // .args(["-q:v", &quality.to_string()]) // NOTE test if quality even does anything
+        .arg(output_directory.join("%05d.bmp"));
 
     // make sure output doesnt interupt our stdout
     command = command
@@ -52,8 +49,10 @@ pub fn play_audio(file_name: &std::path::PathBuf, volume: u8) {
         .expect("audio broke");
 }
 
-// TODO should just create a struct for this return
-pub fn get_meta(file_name: &std::path::PathBuf) -> Option<(u32, u32, Option<f32>, Option<u32>)> {
+// TODO should just create a struct or enum for this return
+pub fn get_meta(
+    file_name: &std::path::PathBuf,
+) -> Result<(u32, u32, Option<f32>, Option<u32>), String> {
     let output: std::process::Output = Command::new("ffprobe")
         .args([file_name.to_str().unwrap()])
         .args(["-v", "quiet"])
@@ -64,11 +63,11 @@ pub fn get_meta(file_name: &std::path::PathBuf) -> Option<(u32, u32, Option<f32>
         .expect("cant probe");
 
     if !output.status.success() {
-        return None;
+        return Err("ffprobe failed, might not be available".to_string());
     }
 
     if output.stdout.is_empty() {
-        return None;
+        return Err("file is not an image or video (or not parsable by ffmpeg)".to_string());
     }
 
     let stdout = str::from_utf8(&output.stdout).unwrap();
@@ -85,5 +84,5 @@ pub fn get_meta(file_name: &std::path::PathBuf) -> Option<(u32, u32, Option<f32>
     let duration: Option<f32> = meta_string[2].parse().ok();
     let frames: Option<u32> = meta_string[3].parse().ok();
 
-    return Some((width, height, duration, frames));
+    return Ok((width, height, duration, frames));
 }
