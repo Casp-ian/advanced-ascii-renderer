@@ -118,7 +118,7 @@ impl<'b> Textifier<'b> {
             None => self.run_try(&image),
             Some(crate::ProcessingModes::Gpu) => self.run_gpu(&image),
             Some(crate::ProcessingModes::CpuSimple) => self.run_gpu(&image),
-            Some(crate::ProcessingModes::CpuFull) => todo!(),
+            Some(crate::ProcessingModes::Cpu) => todo!(),
         };
 
         if let Err(e) = data {

@@ -20,6 +20,9 @@ pub fn run(args: &Args) -> Result<(), String> {
 
     let (cols, rows) = calculate_dimensions(args, img_width, img_height);
 
+    let img_width = args.char_width * cols;
+    let img_height = args.char_height * rows;
+    // this has to be given to image and video stuff
     let (img_width, img_height) = (144, 144);
 
     let mut textifier = Textifier::new(&args, img_width, img_height, cols, rows);
@@ -62,6 +65,7 @@ fn do_image_stuff(args: &Args, textifier: &mut Textifier, _: &u32) -> Result<(),
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
+        let image = image.resize(144, 144, image::imageops::FilterType::Nearest);
         print!("{}", textifier.to_text(image)?);
 
         // clear ansi color code

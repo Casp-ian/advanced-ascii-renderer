@@ -73,6 +73,7 @@ pub struct Args {
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
 pub enum MediaModes {
+    /// just a single frame
     Image,
     /// textify frames as fast as it can, requires ffmpeg
     Video,
@@ -82,11 +83,12 @@ pub enum MediaModes {
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
 pub enum ProcessingModes {
+    /// runs on gpu, this is the main mode
     Gpu,
+    /// runs on cpu but tries to look similar to gpu, might take a while
+    Cpu,
     /// runs on cpu but with less features than gpu
     CpuSimple,
-    /// runs on cpu but tries to look similar to gpu, might take a while
-    CpuFull,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
