@@ -34,7 +34,7 @@ pub fn get_scale(
 
     // TODO here we could check if the aspect ration ends up being close to matching the original, and warn if we think the result will be stretched
 
-    let internal_scale = (output_scale.0 * 4, output_scale.1 * 4);
+    let internal_scale = (output_scale.0 * 3, output_scale.1 * 3);
     // let internal_scale = (
     //     output_scale.0 * char_dimensions.0,
     //     output_scale.1 * char_dimensions.1,

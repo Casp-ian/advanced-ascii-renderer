@@ -24,7 +24,7 @@ pub fn start_getting_frames(
         .args(["-i", input_file.to_str().unwrap()])
         .args([
             "-vf",
-            &format!("scale={}:{},fps=30/1", internal_scale.0, internal_scale.1),
+            &format!("scale={}:{},fps=15/1", internal_scale.0, internal_scale.1),
         ])
         // .args(["-filter:v", "fps=3/1"])
         // .args(["-q:v", &quality.to_string()]) // NOTE test if quality even does anything
