@@ -12,17 +12,44 @@ pub mod terminal;
 pub mod textifier;
 use textifier::Textifier;
 
+use crate::terminal::{get_scale, get_terminal_size};
+
+// do cli parsing
+//
+// inputscale, duration, frames = getMeta(path)
+// internalScale, outputscale = getScales(characterSizes, specifiedOutputScale, inputScale, outputScaleLimit)
+//
+// image {
+//     textifier = init(internalScale, outputScale, renderOptions)
+//     image = getImage(path, internalScale)
+//     text = textifier(image)
+//     print(text)
+// }
+//
+// frames {
+//     textifier = init(internalScale, outputScale, renderOptions)
+//     frames = getFrames(path, internalScale, duration, frames, videoOptions)
+//
+//     frame = frames.next() {
+//         text = textifier(frame)
+//         print(text)
+//     }
+// }
+//
+
 pub fn run(args: &Args) -> Result<(), String> {
-    let (img_width, img_height, _, frames) = match ffutils::get_meta(&args.path) {
+    let (input_scale, _, frames) = match ffutils::get_meta(&args.path) {
         Err(e) => return Err(format!("{} for {:?}", e, args.path).to_string()),
         Ok(x) => x,
     };
 
-    let (cols, rows) = calculate_dimensions(args, img_width, img_height);
+    let (_, (cols, rows)) = get_scale(
+        (args.char_width, args.char_height),
+        (args.width, args.height),
+        input_scale,
+        get_terminal_size(),
+    );
 
-    let img_width = args.char_width * cols;
-    let img_height = args.char_height * rows;
-    // this has to be given to image and video stuff
     let (img_width, img_height) = (144, 144);
 
     let mut textifier = Textifier::new(&args, img_width, img_height, cols, rows);
@@ -42,19 +69,6 @@ pub fn run(args: &Args) -> Result<(), String> {
         }
     };
     return result;
-}
-
-fn calculate_dimensions(args: &Args, image_width: u32, image_height: u32) -> (u32, u32) {
-    let (columns, rows) = terminal::get_cols_and_rows(
-        args.char_width,
-        args.char_height,
-        args.width,
-        args.height,
-        image_width,
-        image_height,
-    );
-
-    return (columns, rows);
 }
 
 fn do_image_stuff(args: &Args, textifier: &mut Textifier, _: &u32) -> Result<(), String> {

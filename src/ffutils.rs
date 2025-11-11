@@ -52,7 +52,7 @@ pub fn play_audio(file_name: &std::path::PathBuf, volume: u8) {
 // TODO should just create a struct or enum for this return
 pub fn get_meta(
     file_name: &std::path::PathBuf,
-) -> Result<(u32, u32, Option<f32>, Option<u32>), String> {
+) -> Result<((u32, u32), Option<f32>, Option<u32>), String> {
     let output: std::process::Output = Command::new("ffprobe")
         .args([file_name.to_str().unwrap()])
         .args(["-v", "quiet"])
@@ -84,5 +84,5 @@ pub fn get_meta(
     let duration: Option<f32> = meta_string[2].parse().ok();
     let frames: Option<u32> = meta_string[3].parse().ok();
 
-    return Ok((width, height, duration, frames));
+    return Ok(((width, height), duration, frames));
 }

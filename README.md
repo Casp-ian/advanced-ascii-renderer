@@ -12,7 +12,7 @@ Usecases could include:
 - Sending low resolution images in Discord servers where you dont have image permisions.
 - Fun.
 
-## example 
+## example
 The primeagens profile picture
 ```
 $ imageToText ~/Pictures/prime.jpeg --set ascii --height 40
@@ -79,3 +79,4 @@ $ imageToText ~/Pictures/prime.jpeg --set ascii --height 40
 - on full cpu backup mode for if the user doenst have a GPU
 - recognizing text and making that visible
 - resizing on terminal resize
+- interactive mode, seeing changes in
