@@ -10,6 +10,7 @@ pub fn start_getting_frames(
     output_directory: &std::path::PathBuf,
     quality: &u8,
     format: &Option<String>,
+    internal_scale: &(u32, u32),
 ) -> Result<(), String> {
     let mut command = &mut Command::new("ffmpeg");
     command = command.arg("-y");
@@ -21,7 +22,10 @@ pub fn start_getting_frames(
     command = command
         .args(["-readrate", "1.0"])
         .args(["-i", input_file.to_str().unwrap()])
-        .args(["-vf", "scale=144:144,fps=30/1"]) // NOTE also test scale
+        .args([
+            "-vf",
+            &format!("scale={}:{},fps=30/1", internal_scale.0, internal_scale.1),
+        ])
         // .args(["-filter:v", "fps=3/1"])
         // .args(["-q:v", &quality.to_string()]) // NOTE test if quality even does anything
         .arg(output_directory.join("%05d.bmp"));

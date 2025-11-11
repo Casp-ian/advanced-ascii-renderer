@@ -1,5 +1,6 @@
 use crossterm::terminal;
 
+// this kinda shouldnt be in the `terminal` file
 pub fn get_scale(
     char_dimensions: (u32, u32),
     specified_output: (Option<u32>, Option<u32>),
@@ -31,12 +32,13 @@ pub fn get_scale(
         }
     };
 
-    // here we can check if the aspect ration ends up being close to matching the original, and warn if we think the result will be stretched
+    // TODO here we could check if the aspect ration ends up being close to matching the original, and warn if we think the result will be stretched
 
-    let internal_scale = (
-        output_scale.0 * char_dimensions.0,
-        output_scale.1 * char_dimensions.1,
-    );
+    let internal_scale = (output_scale.0 * 4, output_scale.1 * 4);
+    // let internal_scale = (
+    //     output_scale.0 * char_dimensions.0,
+    //     output_scale.1 * char_dimensions.1,
+    // );
 
     return (internal_scale, output_scale);
 }

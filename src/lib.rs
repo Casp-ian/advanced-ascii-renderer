@@ -43,35 +43,44 @@ pub fn run(args: &Args) -> Result<(), String> {
         Ok(x) => x,
     };
 
-    let (_, (cols, rows)) = get_scale(
+    let (internal_scale, output_scale) = get_scale(
         (args.char_width, args.char_height),
         (args.width, args.height),
         input_scale,
         get_terminal_size(),
     );
 
-    let (img_width, img_height) = (144, 144);
+    let rows = output_scale.1;
 
-    let mut textifier = Textifier::new(&args, img_width, img_height, cols, rows);
+    let mut textifier = Textifier::new(&args, internal_scale, output_scale);
 
     let result: Result<(), String> = match args.media_mode {
-        Some(MediaModes::Image) => do_image_stuff(args, &mut textifier, &rows),
+        Some(MediaModes::Image) => {
+            do_image_stuff(args, &mut textifier, &internal_scale, &output_scale)
+        }
         Some(MediaModes::Video) | Some(MediaModes::Stream) => {
-            do_video_stuff(args, &mut textifier, &rows)
+            do_video_stuff(args, &mut textifier, &internal_scale, &output_scale)
         }
         None => {
             match frames {
                 // More then 1 frame means video
-                Some(x) if x > 1 => do_video_stuff(args, &mut textifier, &rows),
+                Some(x) if x > 1 => {
+                    do_video_stuff(args, &mut textifier, &internal_scale, &output_scale)
+                }
                 // Else image
-                _ => do_image_stuff(args, &mut textifier, &rows),
+                _ => do_image_stuff(args, &mut textifier, &internal_scale, &output_scale),
             }
         }
     };
     return result;
 }
 
-fn do_image_stuff(args: &Args, textifier: &mut Textifier, _: &u32) -> Result<(), String> {
+fn do_image_stuff(
+    args: &Args,
+    textifier: &mut Textifier,
+    internal_scale: &(u32, u32),
+    output_scale: &(u32, u32),
+) -> Result<(), String> {
     let reader_result = ImageReader::open(&args.path);
     if reader_result.is_err() {
         return Err("Cannot find file".to_string());
@@ -79,7 +88,11 @@ fn do_image_stuff(args: &Args, textifier: &mut Textifier, _: &u32) -> Result<(),
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
-        let image = image.resize(144, 144, image::imageops::FilterType::Nearest);
+        let image = image.resize(
+            internal_scale.0,
+            internal_scale.1,
+            image::imageops::FilterType::Nearest,
+        );
         print!("{}", textifier.to_text(image)?);
 
         // clear ansi color code
@@ -91,8 +104,16 @@ fn do_image_stuff(args: &Args, textifier: &mut Textifier, _: &u32) -> Result<(),
     }
 }
 
-fn do_video_stuff(args: &Args, textifier: &mut Textifier, rows: &u32) -> Result<(), String> {
-    let mut video_frame_grabber = video::FrameGrabber::new(args).unwrap();
+fn do_video_stuff(
+    args: &Args,
+    textifier: &mut Textifier,
+    internal_scale: &(u32, u32),
+    output_scale: &(u32, u32),
+) -> Result<(), String> {
+    // TODO set internal scale to ffmpeg
+    let mut video_frame_grabber = video::FrameGrabber::new(args, &internal_scale).unwrap();
+
+    let rows = output_scale.1;
 
     let mut first_loop = true;
     while let Some(image) = video_frame_grabber.next() {

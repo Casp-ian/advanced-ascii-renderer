@@ -15,29 +15,35 @@ use crate::Args;
 
 pub struct Textifier<'a> {
     args: &'a Args,
-    input_width: u32,
-    input_height: u32,
-    output_width: u32,
-    output_height: u32,
+    internal_scale: (u32, u32),
+    // input_width: u32,
+    // input_height: u32,
+    output_scale: (u32, u32),
+    // output_width: u32,
+    // output_height: u32,
     abandon_gpu: bool,
     gpu: Option<WgpuContext>,
 }
 impl<'b> Textifier<'b> {
     pub fn new<'a>(
         args: &'a Args,
-        input_width: u32,
-        input_height: u32,
-        output_width: u32,
-        output_height: u32,
+        internal_scale: (u32, u32),
+        // input_width: u32,
+        // input_height: u32,
+        output_scale: (u32, u32),
+        // output_width: u32,
+        // output_height: u32,
     ) -> Textifier<'a> {
         return Textifier {
             args,
             abandon_gpu: false,
             gpu: None,
-            input_width,
-            input_height,
-            output_width,
-            output_height,
+            internal_scale,
+            // input_width,
+            // input_height,
+            output_scale,
+            // output_width,
+            // output_height,
         };
     }
 
@@ -72,20 +78,20 @@ impl<'b> Textifier<'b> {
     fn run_cpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
         return cpu::simple(
             &image,
-            self.input_width,
-            self.input_height,
-            self.output_width,
-            self.output_height,
+            self.internal_scale.0,
+            self.internal_scale.1,
+            self.output_scale.0,
+            self.output_scale.1,
         );
     }
 
     fn run_gpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
         if self.gpu.is_none() {
             self.setup_gpu(
-                self.input_width,
-                self.input_height,
-                self.output_width,
-                self.output_height,
+                self.internal_scale.0,
+                self.internal_scale.1,
+                self.output_scale.0,
+                self.output_scale.1,
                 get_line_pieces(),
             )?;
         }

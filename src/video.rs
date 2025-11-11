@@ -16,7 +16,10 @@ pub struct FrameGrabber<'a> {
     counter: u16,
 }
 impl<'b> FrameGrabber<'b> {
-    pub fn new<'a>(args: &'a Args) -> Result<FrameGrabber<'a>, String> {
+    pub fn new<'a>(
+        args: &'a Args,
+        internal_scale: &(u32, u32),
+    ) -> Result<FrameGrabber<'a>, String> {
         let start_time = Instant::now();
 
         // We use the pid so we can have multiple of our program running at the same time without issues
@@ -39,7 +42,8 @@ impl<'b> FrameGrabber<'b> {
             &args.path,
             &output_dir,
             &args.quality,
-            &args.format, //
+            &args.format,
+            &internal_scale,
         )?;
         if args.volume > 0 {
             // start audio sub-process
