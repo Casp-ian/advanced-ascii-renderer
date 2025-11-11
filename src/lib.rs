@@ -88,7 +88,7 @@ fn do_image_stuff(
     let img_result = reader_result.unwrap().decode();
 
     if let Ok(image) = img_result {
-        let image = image.resize(
+        let image = image.resize_exact(
             internal_scale.0,
             internal_scale.1,
             image::imageops::FilterType::Nearest,
