@@ -19,6 +19,8 @@ fn main() -> ExitCode {
 
     let result: Result<(), String> = run(&args);
 
+    do_before_exit();
+
     match result {
         Ok(_) => {
             return ExitCode::SUCCESS;

@@ -4,7 +4,7 @@ use std::{env, fs, io::ErrorKind};
 
 use image::{DynamicImage, ImageReader};
 
-use crate::{Args, MediaModes};
+use crate::Args;
 
 use crate::ffutils;
 
@@ -13,6 +13,7 @@ pub const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.bmp";
 pub struct FrameGrabber<'a> {
     args: &'a Args,
     start_time: Instant,
+    fps: u8,
     counter: u16,
 }
 impl<'b> FrameGrabber<'b> {
@@ -21,6 +22,8 @@ impl<'b> FrameGrabber<'b> {
         internal_scale: &(u32, u32),
     ) -> Result<FrameGrabber<'a>, String> {
         let start_time = Instant::now();
+
+        let fps: u8 = 20;
 
         // We use the pid so we can have multiple of our program running at the same time without issues
         let output_dir = env::temp_dir().join(process::id().to_string());
@@ -38,10 +41,11 @@ impl<'b> FrameGrabber<'b> {
         }
 
         // TODO theoretically these could get out of sync if the surrounding code is too slow
+        //
         ffutils::start_getting_frames(
             &args.path,
             &output_dir,
-            &args.quality,
+            &fps,
             &args.format,
             &internal_scale,
         )?;
@@ -53,6 +57,7 @@ impl<'b> FrameGrabber<'b> {
         return Ok(FrameGrabber {
             args,
             start_time,
+            fps,
             counter: 0,
         });
     }
@@ -80,7 +85,7 @@ impl<'a> Iterator for FrameGrabber<'a> {
                 Ok(x) => {
                     match x.decode() {
                         Ok(image) => {
-                            fs::remove_file(output_location);
+                            let _ = fs::remove_file(output_location);
                             return Some(image);
                         }
                         // Err(e) if e.kind() == ErrorKind::NotFound => (),

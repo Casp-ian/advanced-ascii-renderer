@@ -15,68 +15,66 @@ Usecases could include:
 ## example
 The primeagens profile picture
 ```
-$ imageToText ~/Pictures/prime.jpeg --set ascii --height 40
+$ cargo run ~/Pictures/prime.jpeg --set ascii --height 40
 
-"""""""""""""|oooooooooooooooooooooooooooooooooooooooooooooooo|"""""""""""""""""
-""""""""""""""ooooooooooooooooooooooooooooooooooooooooooooooo|""""""""""""""""""
-""""""""""""""ooooooooooooooooooooooooooooooooooooooooooooooo"""""""""""""""""""
-""""""""""""""|ooooooooooooooooooooooooooooooooooooooooooooo|"""""""""""""""""""
-""""""""""""""|ooooooooooooooooo---"""""""++++++o+++"-oooooo""""""""""""""""""""
-""""""""""""""|oooooooooooooo/."...""""+oo++oo++"++++-+.\oo|""""""""""""""""""""
-"""""""""""""""ooooooooooooo/. ........."""""""+oooo++\""+""""""""""""""""""""""
-"""""""""""""""|oooooooooo||.. " ............."+oooo-ooooo\"""""""""""""""""""""
-"""""""""""""""|oooooooooo|..  . ..............."++o+oo+"+o+"+""""""""""""""""""
-"""""""""""""""|ooooooooo|.. ...        .. ....""\o+"--oo+--+++"""""""""""""""""
-""""""""""""""""ooooooooo......   .. ........"...."o+""""...|+|"""""""""""""""""
-""""""""""""""""|ooooooo|..    .    .............".|"++"""./+++"""""""""""""""""
-""""""""""""""""|oooooo|....  . ..............""+++++oooo+++"-+"""""""""""""""""
-""""""""""""""""|oooooo|..    ....."""""......"+oooo???oo""+""""""""""""""""""""
-"""""""""""""""""|ooooo|..    ....""""""""""+++o???????##?\++"""""""""""""""""""
-"""""""""""""""""|ooooo|.    ...""""""""++\o???#????#####??|""""""""""""""""""""
-"""""""""""""""""|ooo/""| .. ."""""""""oo""+\?o?o??######?||""""""""""""""""""""
-"""""""""""""""""|ooo"."+". ."""+""""....."++o"|||?????###|"""""""""""""""""""""
-""""""""""""""""""ooo|""."...""""""."......."""||++--o????""""""""""""""""""""""
-""""""""""""""""""|ooo|".+"""+"""""""""""...."/?|....".+o|/"""""""""""""""""""""
-""""""""""""""""""|oooo++""""++""""""""""""""|??\++"+????|."""""""""""""""""""""
-""""""""""""""""""|oooo|"""""++++""""""""""""|??##????#?#|""""""""""""""""""""""
-""""""""""""""""""|ooooo\""""+++++"""""""""""|??????????|"""""""""""""""""""""""
-"""""""""""""""""""ooooo."""++++++"""""".""""|??????????|"""""""""""""""""""""""
-"""""""""""""""""""|oo-|""""+++++++""".....-++\-??o????|""""""""""""""""""""""""
-"""""""""""""""""""-" ."""""++++++"....... /"|+???????|"""""""""""""""""""""""""
-"""""""""""""""/\"."+"\.."""++++++"..\+""".".\"+ooo??||"""""""""""""""""""""""""
-""""""""""""""ooo+o""+"".."""+++++"""++"..."+"..\"|??""""""""""""""""""""""""""/
-"""""""""""""++++++o+""++\..""+"+"""""+""+-oo????o?/"""""""""""""""""""""""""/oo
-""""""""""""|+o++++++o+"++"\..."++""""""""""+?????/"""""""""""""""""""""""""oooo
-""""""""+++++++ooooooooo\"+++\...\++"""+ooo????/"""""""""""""""""""""""""/oooooo
-""""./++++++++++++oooooooo""++""."""+++++++oo-"""""""""""""""""""""""""/oooooooo
-""+++++++++++++++oooooooooo\"+++""+++++|??????\""""""""""""""""""""""/oooooooooo
-+++o++oo??oo+oo++oooooooooooo+++oo++oooo??oo???|"""""""""""""""""""/oooooooooooo
-???????#######?oo+oooooooo????\+ooo?#oo??oooo??-|"""""""""""""""""/ooooooooooooo
-##???#############ooo???#?o???#\++o???#?|ooo???|"""""""""""""""/oooooooooooooooo
-##?####################????????##|+o???/?ooo?\##\\"""""""""""/oooooooooooooooooo
-???####################??????????#++o?|.|?o/o||###\"""""""""oooooooooooooooooooo
-??######################?????????##\o|--\###?#o####||""""/oooooooooooooooooooooo
-#####################??##??????#?###?\\...\\?#?o#####\"/oooooooooooooooooooooooo
+"""""""""""""""oooooooooooooooooooooooooooooooooooooooooooooooooooooo+""""""""""""""""""
+"""""""""""""""|oooooooooooooooooooooooooooooooooooooooooooooooooooo/"""""""""""""""""""
+"""""""""""""""|oooooooooooooooooooooooooooooooooooooooooooooooooooo/"""""""""""""""""""
+""""""""""""""""ooooooooooooooooooooooooooooooooooooooooooooooooooo/""""""""""""""""""""
+""""""""""""""""|oooooooooooooooooooo----------------+------oooooo/"""""""""""""""""""""
+""""""""""""""""|oooooooooooooooo---"".-"-"+ooo+++++""--+--+--\ooo/"""""""""""""""""""""
+""""""""""""""""|oooooooooooooo//--....-\----"------+----o+o-""/--""""""""""""""""""""""
+""""""""""""""""|ooooooooooooo//.. -....-."---.--.""+oooo-oo+\--\-""""""""""""""""""""""
+"""""""""""""""""+oooooooooooo..  ........... ......\-\+o+\--\"+-o""-"""""""""""""""""""
+"""""""""""""""""|oooooooooo-/.......    ....... ..."-|o\"-++"----++"-""""""""""""""""""
+""""""""""""""""""ooooooooo/.......   ..  ............-\\o++++-"..\-+/""""""""""""""""""
+""""""""""""""""""|oooooooo...          .... ...-.....-.\-++-"\"-./"+-""""""""""""""""""
+""""""""""""""""""|ooooooo/....      .---..........-""-------+--"-"+o+""""""""""""""""""
+""""""""""""""""""|ooooooo".    .  ...."""""........|----o-/?-oo++"---""""""""""""""""""
+""""""""""""""""""|ooooooo/.     ......"""""""-------+/-o??oo--\-"+"""""""""""""""""""""
+""""""""""""""""""|oooooo+..    .....""""""""--------???-??#####--++""""""""""""""""""""
+"""""""""""""""""""ooooo//-.  ...."""""""""-""--\????????#######??""""""""""""""""""""""
+"""""""""""""""""""|ooo"/""\... |""""""""-----""+\?/\o\?????####?/""""""""""""""""""""""
+"""""""""""""""""""\ooo+\""-..  /"""+""/......-----"|?+--\???????.""""""""""""""""""""""
+"""""""""""""""""""+oooo"..""\.|""""""""""--....."""|+----------o-""""""""""""""""""""""
+""""""""""""""""""""|oooo"-"++""++""""""""""......|-?+--------/?+-""""""""""""""""""""""
+""""""""""""""""""""|oooo\"-++""++++""""""""""""""|?#?------????"/""""""""""""""""""""""
+""""""""""""""""""""|ooooo"""""""++++"""""""""""""|?#????????#??."""""""""""""""""""""""
+""""""""""""""""""""|oooooo"""""++++++""""""""""""||#???????#?//""""""""""""""""""""""""
+"""""""""""""""""""""ooooo/""""++++++++"""""."+--"||???o??????/"""""""""""""""""""""""""
+"""""""""""""""""""""|----"""""+++"++++//.......--++o??o?????/""""""""""""""""""""""""""
+"""""""""""""""""-""-""\--"""""+++++++"..-------+-|-\---????/"""""""""""""""""""""""""""
+""""""""""""""""/o-.|"+"\..""""++"+++""-.--"+""""---+-o-\???/"""""""""""""""""""""""""""
+"""""""""""""""/ooo+--""+\-.""""+++++""""+----------.-\//?-/""""""""""""""""""""""""""""
+""""""""""""""|++++++o+-"++---.--"+++""""""+"+----???--?--"""""""""""""""""""""""""""--o
+"""""""""""""-ooo+++++o+o\"+++\\.."-+"""""""------/????/""""""""""""""""""""""""""""/ooo
+""""""""--+++++++oooooooooo\""++\-..\-+++-""\oo-????--"""""""""""""""""""""""""""--ooooo
+"""""--+++++++++++++oooooooo-\"+++"-."""++++++++--/-"""""""""""""""""""""""""""--ooooooo
+""--+++++++++++++++ooooooooooo\"++---"++++--------?-"""""""""""""""""""""""""--ooooooooo
+++++------------o++oooooooooooo--++oo--+-ooo??/o????\"""""""""""""""""""""--oooooooooooo
+?-??##?#########---oooooooooo???--\+ooo\?\o???oooo??/o""""""""""""""""""/-oooooooooooooo
+?#????#############---------oo????#-+\o?o-#??ooo--??#"""""""""""""""""--oooooooooooooooo
+?#??######################?????????#\++\o?o--\ooo?\###-\""""""""""""--oooooooooooooooooo
+???#######################???????????\\+oo///|?o-o\\###\\"""""""""/ooooooooooooooooooooo
+???########################??????????##--/-----#--#-\####\""""""-ooooooooooooooooooooooo
 ```
 
 ## current features
 - character sets, current options braile, numbers and ascii
-- changing the width and height, if one is not given the other is calculated to try and match aspect ratio of image
+- changing the width and height, if one is given the other is calculated to match aspect ratio of image, if none is given it tries the biggest that will fit your terminal
 - edge detection using the sobel operator
 - ansi rgb color (use the 'rgb' color set)
 - play video (with audio)
-- show your webcam (on linux with `aar /dev/video0 --format v4l2 --media-mode stream`)
+- show your webcam (on linux with `cargo run /dev/video0 --format v4l2 --media-mode stream`)
 
-## todo (in rough order)
-- re add sobel edge directions as well
+## todo (in rough order, not all equally plausible)
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
 - make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
-- improve video file intake performance (probably just downscaling the frame)
 - upper half block unicode character, with background character color
-- improve color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
+- add color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
 - adjustable line 'thickness' and other parameters
 - loop video
 - on full cpu backup mode for if the user doenst have a GPU
-- recognizing text and making that visible
 - resizing on terminal resize
 - interactive mode, seeing changes in
+- recognizing text and making that visible

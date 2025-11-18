@@ -8,7 +8,8 @@ use std::process::{Command, Stdio};
 pub fn start_getting_frames(
     input_file: &std::path::PathBuf,
     output_directory: &std::path::PathBuf,
-    quality: &u8,
+    // quality: &u8,
+    fps: &u8,
     format: &Option<String>,
     internal_scale: &(u32, u32),
 ) -> Result<(), String> {
@@ -24,9 +25,9 @@ pub fn start_getting_frames(
         .args(["-i", input_file.to_str().unwrap()])
         .args([
             "-vf",
-            &format!("scale={}:{},fps=15/1", internal_scale.0, internal_scale.1),
+            &format!("scale={}:{},fps=20/1", internal_scale.0, internal_scale.1),
         ])
-        // .args(["-filter:v", "fps=3/1"])
+        .args(["-sws_flags", "fast_bilinear"])
         // .args(["-q:v", &quality.to_string()]) // NOTE test if quality even does anything
         .arg(output_directory.join("%05d.bmp"));
 

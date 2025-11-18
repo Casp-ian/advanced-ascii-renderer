@@ -14,7 +14,7 @@ use textifier::Textifier;
 
 use crate::terminal::{get_scale, get_terminal_size};
 
-// do cli parsing
+// do cli parsing pseudo code
 //
 // inputscale, duration, frames = getMeta(path)
 // internalScale, outputscale = getScales(characterSizes, specifiedOutputScale, inputScale, outputScaleLimit)
@@ -49,8 +49,6 @@ pub fn run(args: &Args) -> Result<(), String> {
         input_scale,
         get_terminal_size(),
     );
-
-    let rows = output_scale.1;
 
     let mut textifier = Textifier::new(&args, internal_scale, output_scale);
 
@@ -94,10 +92,6 @@ fn do_image_stuff(
             image::imageops::FilterType::Nearest,
         );
         print!("{}", textifier.to_text(image)?);
-
-        // clear ansi color code
-        println!("\x1b[0m");
-
         return Ok(());
     } else {
         return Err("Cannot open as an image".to_string());
@@ -110,7 +104,6 @@ fn do_video_stuff(
     internal_scale: &(u32, u32),
     output_scale: &(u32, u32),
 ) -> Result<(), String> {
-    // TODO set internal scale to ffmpeg
     let mut video_frame_grabber = video::FrameGrabber::new(args, &internal_scale).unwrap();
 
     let rows = output_scale.1;
@@ -132,8 +125,5 @@ fn do_video_stuff(
         print!("{}{}", ansi, text);
     }
 
-    // new line because we might still be on another line
-    // also clear ansi color code
-    println!("\x1b[0m");
     return Ok(());
 }
