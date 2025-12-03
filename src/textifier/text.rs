@@ -21,7 +21,7 @@ use crate::cli::Args;
 // const BRIGHT_CYAN: &str = "\x1b[96m";
 // const BRIGHT_WHITE: &str = "\x1b[97m";
 
-pub fn translate_to_text(args: &Args, data: Vec<Vec<PixelData>>) -> String {
+pub fn translate_to_text(args: &Args, data: Vec<Vec<CharacterData>>) -> String {
     let mut result = "".to_string();
 
     // TODO also not really pixels
@@ -60,7 +60,7 @@ pub fn get_ansi_color_code(color_set: &ColorSet, color: [u8; 3]) -> String {
 
 pub fn get_char(
     char_set: &CharSet,
-    pixel: &PixelData,
+    pixel: &CharacterData,
     inverted: bool,
     no_lines: bool,
     only_lines: bool,

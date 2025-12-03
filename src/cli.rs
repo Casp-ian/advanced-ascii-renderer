@@ -1,6 +1,62 @@
 use clap::{Parser, ValueEnum};
 use std::fmt::Debug;
 
+// pub struct GeneralOptions {
+//     /// Path of image
+//     pub path: std::path::PathBuf,
+
+//     /// Output width in characters
+//     pub width: Option<u32>,
+
+//     /// Output height in characters
+//     pub height: Option<u32>,
+
+//     /// choose how to read the file
+//     pub media_mode: Option<MediaModes>,
+
+//     /// choose wether to use gpu or cpu
+//     pub processing_mode: Option<ProcessingModes>,
+// }
+
+// pub struct RenderOptions {
+//     /// Color of text
+//     pub color: ColorSet,
+
+//     /// Characters used for result
+//     pub set: CharSet,
+
+//     /// make dark areas light, and light areas dark
+//     pub inverted: bool,
+
+//     /// from 0 to 1, this is the threshold for how clear of an edge something has to be
+//     pub threshold: f32,
+
+//     /// remove the lines characters like /-\|
+//     pub no_lines: bool,
+
+//     /// remove everythin appart from the lines
+//     pub only_lines: bool,
+
+//     // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
+//     // i do not know how to get these, so for now we have hardcoded defaults
+//     /// the width of a character in pixels, only use if the defaults dont suit your needs or dont match your font
+//     pub char_width: u32,
+
+//     /// the height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
+//     pub char_height: u32,
+// }
+
+// pub struct VideoOptions {
+//     /// Only affects videos, lower value is high quality, higher value is
+//     pub quality: u8,
+
+//     /// Only affects videos, sets audio volume, clamps to 100
+//     pub volume: u8,
+
+//     /// Only affects videos, sets ffmpeg format if ffmpeg cant auto detect
+//     pub format: Option<String>,
+// }
+
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
 #[command(author, version, about)]

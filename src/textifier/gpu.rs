@@ -4,7 +4,7 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
 };
 
-use crate::textifier::types::{Direction, PixelData};
+use crate::textifier::types::{CharacterData, Direction};
 
 pub struct WgpuContext {
     device: wgpu::Device,
@@ -252,7 +252,7 @@ impl WgpuContext {
     pub async fn process(
         &self,
         input_image: image::ImageBuffer<Rgba<u8>, Vec<u8>>,
-    ) -> Result<Vec<Vec<PixelData>>, String> {
+    ) -> Result<Vec<Vec<CharacterData>>, String> {
         // will get the image to the gpu
         self.queue
             .write_buffer(&self.input_buffer, 0, input_image.as_raw());
@@ -327,9 +327,9 @@ impl WgpuContext {
         self.output_staging_buffer.unmap();
 
         // Cast bytes to correct type
-        let single_vec_data: Vec<PixelData> = raw_result
+        let single_vec_data: Vec<CharacterData> = raw_result
             .chunks_exact(3)
-            .map(|x| PixelData {
+            .map(|x| CharacterData {
                 direction: Direction::from_int(bytemuck::cast(x[0])),
                 color: Rgb([
                     bytemuck::cast_slice::<f32, u8>(&[x[1]])[0],
@@ -343,7 +343,7 @@ impl WgpuContext {
         let result = single_vec_data
             .chunks(self.output_width as usize)
             .map(|x| x.to_vec())
-            .collect::<Vec<Vec<PixelData>>>();
+            .collect::<Vec<Vec<CharacterData>>>();
 
         return Ok(result);
     }

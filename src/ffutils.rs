@@ -1,45 +1,73 @@
-use std::process::{Command, Stdio};
+use std::{
+    io::{BufReader, Read},
+    process::{ChildStdout, Command, Stdio},
+};
 
-// NOTE, ffmpeg-next or the other ffmpeg/video packages seemed quite large, and do not have this specific usecase in mind
-// so we just run the ffmpeg command of the system, can be changed later
+use image::{ImageBuffer, Rgb};
 
-// note that right now there is technically some wasted work encoding and decoding the files (tho to .bmp, so should be very light) and writing to disk
+pub struct Pegger {
+    buf: Box<[u8]>,
+    reader: BufReader<ChildStdout>,
+    x: u32,
+    y: u32,
+}
 
-pub fn start_getting_frames(
-    input_file: &std::path::PathBuf,
-    output_directory: &std::path::PathBuf,
-    // quality: &u8,
-    fps: &u8,
-    format: &Option<String>,
-    internal_scale: &(u32, u32),
-) -> Result<(), String> {
-    let mut command = &mut Command::new("ffmpeg");
-    command = command.arg("-y");
+impl Pegger {
+    pub fn new(
+        input_file: &std::path::PathBuf,
+        fps: &u8,
+        format: &Option<String>,
+        internal_scale: &(u32, u32),
+    ) -> Result<Self, String> {
+        let mut command = &mut Command::new("ffmpeg");
+        command = command.arg("-y");
 
-    if let Some(format) = format {
-        command = command.args(["-f", format.as_str()]);
+        // input format
+        if let Some(format) = format {
+            command = command.args(["-f", format.as_str()]);
+        }
+
+        command = command
+            .args(["-readrate", "1.0"])
+            .args(["-i", input_file.to_str().unwrap()])
+            .args([
+                "-vf",
+                &format!(
+                    "scale={}:{},fps={}/1",
+                    internal_scale.0, internal_scale.1, fps
+                ),
+            ])
+            .args(["-pix_fmt", "rgb24"])
+            .args(["-f", "rawvideo"])
+            .arg("pipe:1");
+
+        // make sure output doesnt interupt our stdout
+        command = command.stdout(Stdio::piped());
+        command = command.stderr(Stdio::null()).stdin(Stdio::null());
+
+        let child = command.spawn().expect("couldnt spawn");
+        let stdout = child.stdout.unwrap();
+
+        let reader = BufReader::new(stdout);
+
+        let size = (internal_scale.0 * internal_scale.1 * 3) as usize;
+        let buf = vec![0; size].into_boxed_slice();
+
+        return Ok(Self {
+            buf,
+            reader,
+            x: internal_scale.0,
+            y: internal_scale.1,
+        });
     }
 
-    command = command
-        .args(["-readrate", "1.0"])
-        .args(["-i", input_file.to_str().unwrap()])
-        .args([
-            "-vf",
-            &format!("scale={}:{},fps=20/1", internal_scale.0, internal_scale.1),
-        ])
-        .args(["-sws_flags", "fast_bilinear"])
-        // .args(["-q:v", &quality.to_string()]) // NOTE test if quality even does anything
-        .arg(output_directory.join("%05d.bmp"));
+    pub fn yoink(&mut self) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+        self.reader.read_exact(&mut self.buf).unwrap();
 
-    // make sure output doesnt interupt our stdout
-    command = command
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .stdin(Stdio::null());
+        // NOTE this clones buf, but i think the cloned value is pretty much the actual image, so thats optimal
+        let test = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(self.x, self.y, self.buf.to_vec());
 
-    match command.spawn() {
-        Ok(_) => return Ok(()),
-        Err(e) => return Err(e.to_string()),
+        return test.unwrap();
     }
 }
 
@@ -82,8 +110,12 @@ pub fn get_meta(
         .split(',')
         .collect();
 
-    let width: u32 = meta_string[0].parse().unwrap();
-    let height: u32 = meta_string[1].parse().unwrap();
+    let width: u32 = meta_string[0]
+        .parse()
+        .expect("no values gotten from ffprobe");
+    let height: u32 = meta_string[1]
+        .parse()
+        .expect("no values gotten from ffprobe");
 
     // could have cleaner way of accounting for n/a
     let duration: Option<f32> = meta_string[2].parse().ok();

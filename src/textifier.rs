@@ -75,7 +75,7 @@ impl<'b> Textifier<'b> {
         }
     }
 
-    fn run_cpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
+    fn run_cpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<CharacterData>>, String> {
         return cpu::simple(
             &image,
             self.internal_scale.0,
@@ -85,7 +85,7 @@ impl<'b> Textifier<'b> {
         );
     }
 
-    fn run_gpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
+    fn run_gpu(&mut self, image: &DynamicImage) -> Result<Vec<Vec<CharacterData>>, String> {
         if self.gpu.is_none() {
             self.setup_gpu(
                 self.internal_scale.0,
@@ -101,7 +101,7 @@ impl<'b> Textifier<'b> {
         return gpu.process(image.to_rgba8()).block_on();
     }
 
-    fn run_try(&mut self, image: &DynamicImage) -> Result<Vec<Vec<PixelData>>, String> {
+    fn run_try(&mut self, image: &DynamicImage) -> Result<Vec<Vec<CharacterData>>, String> {
         if self.abandon_gpu {
             return self.run_cpu(image);
         }
@@ -119,7 +119,7 @@ impl<'b> Textifier<'b> {
     }
 
     pub fn to_text(&mut self, image: DynamicImage) -> Result<String, String> {
-        let data: Result<Vec<Vec<PixelData>>, String>;
+        let data: Result<Vec<Vec<CharacterData>>, String>;
         data = match self.args.processing_mode {
             None => self.run_try(&image),
             Some(crate::ProcessingModes::Gpu) => self.run_gpu(&image),

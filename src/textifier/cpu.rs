@@ -1,6 +1,6 @@
 use image::{DynamicImage, GenericImageView, Rgb};
 
-use super::PixelData;
+use super::CharacterData;
 
 pub fn simple(
     image: &DynamicImage,
@@ -8,8 +8,8 @@ pub fn simple(
     image_height: u32,
     columns: u32,
     rows: u32,
-) -> Result<Vec<Vec<PixelData>>, String> {
-    let mut result: Vec<Vec<PixelData>> = vec![];
+) -> Result<Vec<Vec<CharacterData>>, String> {
+    let mut result: Vec<Vec<CharacterData>> = vec![];
     for y in 0..rows {
         result.push(vec![]);
         for x in 0..columns {
@@ -20,7 +20,7 @@ pub fn simple(
             let brightness = (pixel[0] as f32 / 256.0 * 0.2126)
                 + (pixel[1] as f32 / 256.0 * 0.7152)
                 + (pixel[2] as f32 / 256.0 * 0.0722);
-            result.get_mut(y as usize).unwrap().push(PixelData {
+            result.get_mut(y as usize).unwrap().push(CharacterData {
                 direction: super::Direction::None,
                 brightness,
                 color,

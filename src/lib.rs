@@ -19,29 +19,46 @@ use crate::terminal::{get_scale, get_terminal_size};
 // inputscale, duration, frames = getMeta(path)
 // internalScale, outputscale = getScales(characterSizes, specifiedOutputScale, inputScale, outputScaleLimit)
 //
+// textifier = init(internalScale, outputScale, renderOptions)
+//
 // image {
-//     textifier = init(internalScale, outputScale, renderOptions)
 //     image = getImage(path, internalScale)
 //     text = textifier(image)
 //     print(text)
 // }
 //
 // frames {
-//     textifier = init(internalScale, outputScale, renderOptions)
 //     frames = getFrames(path, internalScale, duration, frames, videoOptions)
 //
-//     frame = frames.next() {
-//         text = textifier(frame)
+//     image = frames.next() {
+//         text = textifier(image)
 //         print(text)
 //     }
 // }
 //
 
+// pseudo try two
+//
+// renderer = renderBuilder();
+//
+// if let arg = cli arg {
+//    renderer.withArg(arg);
+// }
+//
+// renderer.withResolutions(scales);
+// renderer = renderer.build();
+//
+//
+// if let img = cli img {
+//    renderer.render(img)
+// }
+//
+//
+//
+//
+
 pub fn run(args: &Args) -> Result<(), String> {
-    let (input_scale, _, frames) = match ffutils::get_meta(&args.path) {
-        Err(e) => return Err(format!("{} for {:?}", e, args.path).to_string()),
-        Ok(x) => x,
-    };
+    let (input_scale, duration, frames) = ffutils::get_meta(&args.path)?;
 
     let (internal_scale, output_scale) = get_scale(
         (args.char_width, args.char_height),
@@ -52,32 +69,30 @@ pub fn run(args: &Args) -> Result<(), String> {
 
     let mut textifier = Textifier::new(&args, internal_scale, output_scale);
 
-    let result: Result<(), String> = match args.media_mode {
-        Some(MediaModes::Image) => {
-            do_image_stuff(args, &mut textifier, &internal_scale, &output_scale)
-        }
-        Some(MediaModes::Video) | Some(MediaModes::Stream) => {
-            do_video_stuff(args, &mut textifier, &internal_scale, &output_scale)
-        }
+    let is_video: bool = match args.media_mode {
+        Some(MediaModes::Video) | Some(MediaModes::Stream) => true,
+        Some(MediaModes::Image) => false,
         None => {
             match frames {
                 // More then 1 frame means video
-                Some(x) if x > 1 => {
-                    do_video_stuff(args, &mut textifier, &internal_scale, &output_scale)
-                }
+                Some(x) if x > 1 => true,
                 // Else image
-                _ => do_image_stuff(args, &mut textifier, &internal_scale, &output_scale),
+                _ => false,
             }
         }
     };
-    return result;
+
+    if is_video {
+        return do_video_stuff(args, &mut textifier, &internal_scale, &duration);
+    } else {
+        return do_image_stuff(args, &mut textifier, &internal_scale);
+    }
 }
 
 fn do_image_stuff(
     args: &Args,
     textifier: &mut Textifier,
     internal_scale: &(u32, u32),
-    output_scale: &(u32, u32),
 ) -> Result<(), String> {
     let reader_result = ImageReader::open(&args.path);
     if reader_result.is_err() {
@@ -102,26 +117,27 @@ fn do_video_stuff(
     args: &Args,
     textifier: &mut Textifier,
     internal_scale: &(u32, u32),
-    output_scale: &(u32, u32),
+    duration: &Option<f32>,
 ) -> Result<(), String> {
-    let mut video_frame_grabber = video::FrameGrabber::new(args, &internal_scale).unwrap();
+    let mut video_frame_grabber =
+        video::FrameGrabber::new(args, &internal_scale, duration).unwrap();
 
-    let rows = output_scale.1;
+    let mut rows = 0;
 
-    let mut first_loop = true;
+    // let mut first_loop = true;
     while let Some(image) = video_frame_grabber.next() {
         // skip on first run
         let ansi: String;
-        if first_loop {
-            first_loop = false;
-            ansi = "".to_owned();
+        // ESCAPE 1 G = move cursor all the way to the left
+        // ESCAPE n A = move cursor n up
+        if rows != 0 {
+            ansi = format!("\x1b[1G\x1b[{}A", rows);
         } else {
-            // ESCAPE 1 G = move cursor all the way to the left
-            // ESCAPE n A = move cursor n up
-            ansi = format!("\x1b[1G\x1b[{}A", rows - 1);
+            ansi = "".to_owned();
         }
 
         let text = textifier.to_text(image)?;
+        rows = text.lines().count() - 1;
         print!("{}{}", ansi, text);
     }
 

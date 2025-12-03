@@ -1,12 +1,12 @@
 use std::process;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::{env, fs, io::ErrorKind};
 
 use image::{DynamicImage, ImageReader};
 
 use crate::Args;
 
-use crate::ffutils;
+use crate::ffutils::{self, Pegger};
 
 pub const TEMPORARY_IMAGE_FILE_NAME: &str = "ImageToTextTemp.bmp";
 
@@ -14,26 +14,25 @@ pub struct FrameGrabber<'a> {
     args: &'a Args,
     start_time: Instant,
     fps: u8,
-    counter: u16,
+    duration: Option<Duration>,
+    pegger: Pegger,
 }
 impl<'b> FrameGrabber<'b> {
     pub fn new<'a>(
         args: &'a Args,
         internal_scale: &(u32, u32),
+        duration: &Option<f32>,
     ) -> Result<FrameGrabber<'a>, String> {
         let start_time = Instant::now();
-
-        let fps: u8 = 20;
+        let duration: Option<Duration> = if let Some(duration) = duration {
+            Some(Duration::from_secs_f32(*duration))
+        } else {
+            None
+        };
+        let fps: u8 = 15;
 
         // We use the pid so we can have multiple of our program running at the same time without issues
         let output_dir = env::temp_dir().join(process::id().to_string());
-
-        // TODO clean up after ourselves
-        // match fs::remove_dir_all(&output_dir) {
-        //     Err(e) if e.kind() == ErrorKind::NotFound => (), // it is already removed, we are happy
-        //     Ok(_) => (),
-        //     Err(e) => return Err(e.to_string()),
-        // }
 
         match fs::create_dir(&output_dir) {
             Ok(_) => (),
@@ -41,14 +40,9 @@ impl<'b> FrameGrabber<'b> {
         }
 
         // TODO theoretically these could get out of sync if the surrounding code is too slow
-        //
-        ffutils::start_getting_frames(
-            &args.path,
-            &output_dir,
-            &fps,
-            &args.format,
-            &internal_scale,
-        )?;
+        let pegger = Pegger::new(&args.path, &fps, &args.format, &internal_scale).unwrap();
+
+        // ffutils::start_getting_frames(&args.path &output_dir, &fps, &args.format, &internal_scale)?;
         if args.volume > 0 {
             // start audio sub-process
             ffutils::play_audio(&args.path, args.volume);
@@ -58,7 +52,8 @@ impl<'b> FrameGrabber<'b> {
             args,
             start_time,
             fps,
-            counter: 0,
+            duration,
+            pegger,
         });
     }
 }
@@ -71,32 +66,6 @@ impl<'a> Iterator for FrameGrabber<'a> {
         //     Some(MediaModes::Stream) => (),
         //     _ => todo!(),
         // };
-
-        self.counter += 1;
-
-        let output_dir = env::temp_dir().join(process::id().to_string());
-        let output_location = output_dir.join(format!("{:0>5}.bmp", &self.counter));
-
-        loop {
-            match ImageReader::open(&output_location) {
-                Err(e) if e.kind() == ErrorKind::NotFound => {
-                    // eprintln!("counter {:0>5}, not yet here", &self.counter)
-                } // it is already removed, we are happy
-                Ok(x) => {
-                    match x.decode() {
-                        Ok(image) => {
-                            let _ = fs::remove_file(output_location);
-                            return Some(image);
-                        }
-                        // Err(e) if e.kind() == ErrorKind::NotFound => (),
-                        _ => {
-                            // NOTE this should only pass if invalid EOF error
-                            // panic!()
-                        }
-                    }
-                }
-                Err(e) => panic!("{}", e.to_string()),
-            }
-        }
+        return Some(DynamicImage::from(self.pegger.yoink()));
     }
 }
