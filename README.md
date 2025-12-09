@@ -59,6 +59,9 @@ $ cargo run ~/Pictures/prime.jpeg --set ascii --height 40
 ???########################??????????##--/-----#--#-\####\""""""-ooooooooooooooooooooooo
 ```
 
+## note
+for larger resolution videos the non-release build is too slow, just use `cargo run --release` and then it can keep up easily
+
 ## current features
 - character sets, current options braile, numbers and ascii
 - changing the width and height, if one is given the other is calculated to match aspect ratio of image, if none is given it tries the biggest that will fit your terminal

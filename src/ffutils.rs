@@ -1,5 +1,5 @@
 use std::{
-    io::{BufReader, Read},
+    io::{BufReader, ErrorKind, Read},
     process::{ChildStdout, Command, Stdio},
 };
 
@@ -15,7 +15,7 @@ pub struct Pegger {
 impl Pegger {
     pub fn new(
         input_file: &std::path::PathBuf,
-        fps: &u8,
+        fps: &Option<String>,
         format: &Option<String>,
         internal_scale: &(u32, u32),
     ) -> Result<Self, String> {
@@ -33,8 +33,10 @@ impl Pegger {
             .args([
                 "-vf",
                 &format!(
-                    "scale={}:{},fps={}/1",
-                    internal_scale.0, internal_scale.1, fps
+                    "scale={}:{},fps={}",
+                    internal_scale.0,
+                    internal_scale.1,
+                    fps.clone().unwrap()
                 ),
             ])
             .args(["-pix_fmt", "rgb24"])
@@ -61,13 +63,16 @@ impl Pegger {
         });
     }
 
-    pub fn yoink(&mut self) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
-        self.reader.read_exact(&mut self.buf).unwrap();
+    pub fn yoink(&mut self) -> Option<ImageBuffer<Rgb<u8>, Vec<u8>>> {
+        match self.reader.read_exact(&mut self.buf) {
+            Err(e) if e.kind() == ErrorKind::UnexpectedEof => return None,
+            _ => (),
+        }
 
         // NOTE this clones buf, but i think the cloned value is pretty much the actual image, so thats optimal
         let test = ImageBuffer::<Rgb<u8>, Vec<u8>>::from_raw(self.x, self.y, self.buf.to_vec());
 
-        return test.unwrap();
+        return test;
     }
 }
 
@@ -82,18 +87,25 @@ pub fn play_audio(file_name: &std::path::PathBuf, volume: u8) {
         .expect("audio broke");
 }
 
-// TODO should just create a struct or enum for this return
-pub fn get_meta(
-    file_name: &std::path::PathBuf,
-) -> Result<((u32, u32), Option<f32>, Option<u32>), String> {
+pub struct Meta {
+    pub scale: (u32, u32),
+    pub duration: Option<f32>,
+    pub frames: Option<u32>,
+    pub fps: Option<String>,
+}
+
+pub fn get_meta(file_name: &std::path::PathBuf) -> Result<Meta, String> {
     let output: std::process::Output = Command::new("ffprobe")
-        .args([file_name.to_str().unwrap()])
-        .args(["-v", "quiet"])
-        .args(["-select_streams", "v:0"])
-        .args(["-show_entries", "stream=width,height,duration,nb_frames"])
-        .args(["-of", "csv=p=0"])
+        .args([
+            "-v",
+            "quiet",
+            "-show_streams",
+            "-select_streams",
+            "v:0",
+            file_name.to_str().unwrap(),
+        ])
         .output()
-        .expect("cant probe");
+        .expect("starting ffprobe failed");
 
     if !output.status.success() {
         return Err("ffprobe failed, might not be available".to_string());
@@ -105,21 +117,41 @@ pub fn get_meta(
 
     let stdout = str::from_utf8(&output.stdout).unwrap();
 
-    let meta_string: Vec<&str> = stdout
-        .trim_end_matches(&['\r', '\n']) // trim newline for windows and linux
-        .split(',')
-        .collect();
+    let mut width: u32 = 0;
+    let mut height: u32 = 0;
 
-    let width: u32 = meta_string[0]
-        .parse()
-        .expect("no values gotten from ffprobe");
-    let height: u32 = meta_string[1]
-        .parse()
-        .expect("no values gotten from ffprobe");
+    let mut duration: Option<f32> = None;
+    let mut frames: Option<u32> = None;
+    let mut fps: Option<String> = None;
 
-    // could have cleaner way of accounting for n/a
-    let duration: Option<f32> = meta_string[2].parse().ok();
-    let frames: Option<u32> = meta_string[3].parse().ok();
+    for line in stdout.lines() {
+        if let Some(x) = line.strip_prefix("r_frame_rate=") {
+            if x != "N/A" {
+                fps = Some(x.to_string());
+            }
+        } else if let Some(x) = line.strip_prefix("nb_frames=") {
+            frames = x.parse().ok();
+        } else if let Some(x) = line.strip_prefix("duration=") {
+            duration = x.parse().ok();
+        } else if let Some(x) = line.strip_prefix("width=") {
+            if let Ok(x) = x.parse::<u32>() {
+                width = x;
+            }
+        } else if let Some(x) = line.strip_prefix("height=") {
+            if let Ok(x) = x.parse::<u32>() {
+                height = x;
+            }
+        }
+    }
 
-    return Ok(((width, height), duration, frames));
+    if width == 0 || height == 0 {
+        return Err("No width or height found in ffprobe result".to_string());
+    }
+
+    return Ok(Meta {
+        scale: (width, height),
+        duration,
+        frames,
+        fps,
+    });
 }

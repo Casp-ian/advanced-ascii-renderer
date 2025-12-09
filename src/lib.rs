@@ -12,7 +12,10 @@ pub mod terminal;
 pub mod textifier;
 use textifier::Textifier;
 
-use crate::terminal::{get_scale, get_terminal_size};
+use crate::{
+    ffutils::Meta,
+    terminal::{get_scale, get_terminal_size},
+};
 
 // do cli parsing pseudo code
 //
@@ -54,16 +57,14 @@ use crate::terminal::{get_scale, get_terminal_size};
 // }
 //
 //
-//
-//
 
 pub fn run(args: &Args) -> Result<(), String> {
-    let (input_scale, duration, frames) = ffutils::get_meta(&args.path)?;
+    let metadata = ffutils::get_meta(&args.path)?;
 
     let (internal_scale, output_scale) = get_scale(
         (args.char_width, args.char_height),
         (args.width, args.height),
-        input_scale,
+        metadata.scale,
         get_terminal_size(),
     );
 
@@ -73,7 +74,7 @@ pub fn run(args: &Args) -> Result<(), String> {
         Some(MediaModes::Video) | Some(MediaModes::Stream) => true,
         Some(MediaModes::Image) => false,
         None => {
-            match frames {
+            match metadata.frames {
                 // More then 1 frame means video
                 Some(x) if x > 1 => true,
                 // Else image
@@ -83,7 +84,7 @@ pub fn run(args: &Args) -> Result<(), String> {
     };
 
     if is_video {
-        return do_video_stuff(args, &mut textifier, &internal_scale, &duration);
+        return do_video_stuff(args, &mut textifier, &internal_scale, metadata);
     } else {
         return do_image_stuff(args, &mut textifier, &internal_scale);
     }
@@ -117,10 +118,9 @@ fn do_video_stuff(
     args: &Args,
     textifier: &mut Textifier,
     internal_scale: &(u32, u32),
-    duration: &Option<f32>,
+    meta: Meta,
 ) -> Result<(), String> {
-    let mut video_frame_grabber =
-        video::FrameGrabber::new(args, &internal_scale, duration).unwrap();
+    let mut video_frame_grabber = video::FrameGrabber::new(args, &internal_scale, meta).unwrap();
 
     let mut rows = 0;
 
