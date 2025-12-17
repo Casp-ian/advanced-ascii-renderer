@@ -1,61 +1,11 @@
-use clap::{Parser, ValueEnum};
-use std::fmt::Debug;
+use clap::{Parser, ValueEnum, arg, builder::PossibleValue, command};
 
-// pub struct GeneralOptions {
-//     /// Path of image
-//     pub path: std::path::PathBuf,
+use crate::args::{
+    CharSet, ColorSet, GeneralOptions, MediaModes, Options, ProcessingModes, RenderOptions,
+    VideoOptions,
+};
 
-//     /// Output width in characters
-//     pub width: Option<u32>,
-
-//     /// Output height in characters
-//     pub height: Option<u32>,
-
-//     /// choose how to read the file
-//     pub media_mode: Option<MediaModes>,
-
-//     /// choose wether to use gpu or cpu
-//     pub processing_mode: Option<ProcessingModes>,
-// }
-
-// pub struct RenderOptions {
-//     /// Color of text
-//     pub color: ColorSet,
-
-//     /// Characters used for result
-//     pub set: CharSet,
-
-//     /// make dark areas light, and light areas dark
-//     pub inverted: bool,
-
-//     /// from 0 to 1, this is the threshold for how clear of an edge something has to be
-//     pub threshold: f32,
-
-//     /// remove the lines characters like /-\|
-//     pub no_lines: bool,
-
-//     /// remove everythin appart from the lines
-//     pub only_lines: bool,
-
-//     // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
-//     // i do not know how to get these, so for now we have hardcoded defaults
-//     /// the width of a character in pixels, only use if the defaults dont suit your needs or dont match your font
-//     pub char_width: u32,
-
-//     /// the height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
-//     pub char_height: u32,
-// }
-
-// pub struct VideoOptions {
-//     /// Only affects videos, lower value is high quality, higher value is
-//     pub quality: u8,
-
-//     /// Only affects videos, sets audio volume, clamps to 100
-//     pub volume: u8,
-
-//     /// Only affects videos, sets ffmpeg format if ffmpeg cant auto detect
-//     pub format: Option<String>,
-// }
+// TODO all of the default options are duplicated between Options and Args
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
@@ -73,11 +23,11 @@ pub struct Args {
     pub height: Option<u32>,
 
     /// Color of text
-    #[arg(long, default_value_t, value_enum)]
+    #[arg(long, default_value_t = ColorSet::None, value_enum)]
     pub color: ColorSet,
 
     /// Characters used for result
-    #[arg(long, default_value_t, value_enum)]
+    #[arg(long, default_value_t = CharSet::Ascii, value_enum)]
     pub set: CharSet,
 
     /// Only affects videos, lower value is high quality, higher value is
@@ -120,52 +70,102 @@ pub struct Args {
 
     /// choose how to read the file
     #[arg(long, value_enum)]
-    pub media_mode: Option<MediaModes>,
+    pub media: Option<MediaModes>,
 
     /// choose wether to use gpu or cpu
     #[arg(long, value_enum)]
-    pub processing_mode: Option<ProcessingModes>,
+    pub processing: Option<ProcessingModes>,
 }
 
-#[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
-pub enum MediaModes {
-    /// just a single frame
-    Image,
-    /// textify frames as fast as it can, requires ffmpeg
-    Video,
-    /// just like video but for things like your webcam that dont have a set duration
-    Stream,
-}
-
-#[derive(ValueEnum, Clone, Copy, Debug, PartialEq)]
-pub enum ProcessingModes {
-    /// runs on gpu, this is the main mode
-    Gpu,
-    /// runs on cpu but tries to look similar to gpu, might take a while
-    Cpu,
-    /// runs on cpu but with less features than gpu
-    CpuSimple,
-}
-
-#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
-pub enum ColorSet {
-    #[default]
-    None,
-    RGB,
-}
-
-// The actual arrays of characters used for the character sets could be stored inside this enum, but i dont think it really matters
-// and if it does its an easy refactor for later, ill just keep it like this so its similar to the color set
-#[derive(ValueEnum, Clone, Copy, Debug, Default, PartialEq)]
-pub enum CharSet {
-    #[default]
-    Ascii,
-    Braile,
-    Numbers,
-    Discord,
-}
-
-pub fn get_cli_args() -> Args {
+pub fn get_cli_args() -> Options {
     // TODO maybe do some erro handling here
-    return Args::parse();
+    let args = Args::parse();
+
+    let general = GeneralOptions {
+        path: args.path,
+        media_mode: args.media,
+        processing_mode: args.processing,
+    };
+
+    let render = RenderOptions {
+        width: args.width,
+        height: args.height,
+        color: args.color,
+        set: args.set,
+        inverted: args.inverted,
+        threshold: args.threshold,
+        no_lines: args.no_lines,
+        only_lines: args.only_lines,
+        char_width: args.char_width,
+        char_height: args.char_height,
+    };
+
+    // TODO now i cant easily check if any of these have been explicitely set by the user, so i can give a warning about useless video settings if image mode is set
+    let video = VideoOptions {
+        quality: args.quality,
+        volume: args.volume,
+        format: args.format,
+    };
+
+    return Options {
+        general,
+        render,
+        video,
+    };
+}
+
+impl ValueEnum for ColorSet {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[ColorSet::None, ColorSet::RGB]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            ColorSet::None => Some(PossibleValue::new("none")),
+            ColorSet::RGB => Some(PossibleValue::new("rgb")),
+        }
+    }
+}
+impl ValueEnum for CharSet {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[
+            CharSet::Ascii,
+            CharSet::Braile,
+            CharSet::Numbers,
+            CharSet::Discord,
+        ]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            CharSet::Ascii => Some(PossibleValue::new("ascii")),
+            CharSet::Braile => Some(PossibleValue::new("braile")),
+            CharSet::Numbers => Some(PossibleValue::new("numbers")),
+            CharSet::Discord => Some(PossibleValue::new("discord")),
+        }
+    }
+}
+impl ValueEnum for MediaModes {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[MediaModes::Image, MediaModes::Video]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            MediaModes::Image => Some(PossibleValue::new("image")),
+            MediaModes::Video => Some(PossibleValue::new("video")),
+        }
+    }
+}
+impl ValueEnum for ProcessingModes {
+    fn value_variants<'a>() -> &'a [Self] {
+        &[ProcessingModes::Gpu, ProcessingModes::CpuSimple]
+    }
+
+    fn to_possible_value(&self) -> Option<PossibleValue> {
+        match self {
+            ProcessingModes::Gpu => Some(PossibleValue::new("gpu")),
+            ProcessingModes::CpuSimple => Some(PossibleValue::new("cpu")),
+        }
+    }
 }

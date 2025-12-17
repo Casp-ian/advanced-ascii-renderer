@@ -22,23 +22,25 @@ pub fn get_scale(
         (Some(x), None) => (x, yfromx(x)),
         (None, Some(y)) => (xfromy(y), y),
         (None, None) => {
-            let x = (output_scale_limit.0, yfromx(output_scale_limit.0));
+            let fitting_x = (output_scale_limit.0, yfromx(output_scale_limit.0));
 
-            if x.1 > output_scale_limit.1 {
-                (xfromy(output_scale_limit.1), output_scale_limit.1)
+            if fitting_x.1 > output_scale_limit.1 {
+                let fitting_y = (xfromy(output_scale_limit.1), output_scale_limit.1);
+                fitting_y
             } else {
-                x
+                fitting_x
             }
         }
     };
 
     // TODO here we could check if the aspect ration ends up being close to matching the original, and warn if we think the result will be stretched
 
-    let internal_scale = (output_scale.0 * 3, output_scale.1 * 3);
-    // let internal_scale = (
-    //     output_scale.0 * char_dimensions.0,
-    //     output_scale.1 * char_dimensions.1,
-    // );
+    // TODO 8 is a magic number here for now
+    let mut internal_scale = (output_scale.0 * 5, output_scale.1 * 5);
+    if internal_scale.0 > input_scale.0 || internal_scale.1 > input_scale.1 {
+        // NOTE this means the input image is kind of small, we maybe should warn the user here too
+        internal_scale = input_scale;
+    }
 
     return (internal_scale, output_scale);
 }

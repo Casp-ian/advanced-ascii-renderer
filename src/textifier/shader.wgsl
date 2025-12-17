@@ -37,7 +37,7 @@ fn coordsInput(x: u32, y: u32) -> u32 {
 
 fn coordsOutput(x: u32, y: u32) -> u32 {
     // i dont think we want this to wrap
-    // bit we dont have asserts...
+    // but we dont have asserts...
     return x + (y * config.outputWidth);
 }
 
@@ -70,16 +70,16 @@ fn do_edges(@builtin(global_invocation_id) global_id: vec3<u32>) {
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y - stepY )] )),
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y - stepY )] )),
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y - stepY )] )),
-        
+
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + 0     )] )),
         0.0, // we could sample this, but for sobel it wont be used anyways
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + 0     )] )),
-        
+
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - stepX, global_id.y + stepY )] )),
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x - 0,     global_id.y + stepY )] )),
         brightness(unpack4x8unorm( inputTexture[coordsInput(global_id.x + stepX, global_id.y + stepY )] )),
     );
-    
+
     let sobelX = mat3x3f(
         -1, 0, 1,
         -2, 0, 2,
@@ -117,7 +117,7 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let angle = test[1];
 
     let PI: f32 = 3.14159;
-    
+
     let threshold: f32 = config.threshold;
     // var threshold: f32 = 1.0;
     var direction: u32 = 0u;
@@ -142,11 +142,11 @@ fn do_scale(@builtin(global_invocation_id) global_id: vec3<u32>) {
             // return "\\";
         }
     }
-    
+
     let packedColorPixel = inputTexture[coordsInput(XC, YC)];
     let colorPixel: vec4<f32> = unpack4x8unorm( packedColorPixel );
 
-    let brightness = brightness(colorPixel); 
+    let brightness = brightness(colorPixel);
 
     outputBuffer[coordsOutput(global_id.x, global_id.y)] = PixelData(
         direction,

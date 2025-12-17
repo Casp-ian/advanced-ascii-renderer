@@ -68,14 +68,14 @@ for larger resolution videos the non-release build is too slow, just use `cargo 
 - edge detection using the sobel operator
 - ansi rgb color (use the 'rgb' color set)
 - play video (with audio)
-- show your webcam (on linux with `cargo run /dev/video0 --format v4l2 --media-mode stream`)
+- show your webcam (on linux with `cargo run /dev/video0 --format v4l2 --media-mode video`)
 
 ## todo (in rough order, not all equally plausible)
 - improve line detection to be able to place `>`, `<`, `(` and `)` when that fits the detected edge
 - make edge detection only work on edges you cant already see, its useless to show edges you can see by contrast already, use it for the teeny tiny edges
+- adjustable line 'thickness' and other parameters
 - upper half block unicode character, with background character color
 - add color quantization [acerola will save us again](https://www.youtube.com/watch?v=fv-wlo8yVhk)
-- adjustable line 'thickness' and other parameters
 - loop video
 - on full cpu backup mode for if the user doenst have a GPU
 - resizing on terminal resize

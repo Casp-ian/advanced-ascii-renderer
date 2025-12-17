@@ -1,24 +1,12 @@
-use aar::run;
-use std::{
-    env, fs,
-    io::ErrorKind,
-    process::{self, ExitCode},
-};
+use std::process::ExitCode;
 
 use aar::cli::get_cli_args;
+use aar::run;
 
 fn do_before_exit() {
     // new line because we might still be on another line
     // also clear ansi color code
     println!("\x1b[0m");
-
-    // remove the temp directory we might have used
-    let output_dir = env::temp_dir().join(process::id().to_string());
-    match fs::remove_dir_all(&output_dir) {
-        Err(e) if e.kind() == ErrorKind::NotFound => (), // it is already removed, we are happy
-        Ok(_) => (),
-        Err(e) => eprint!("somehow failed in deleting {:?}, {:?}", output_dir, e),
-    }
 }
 
 fn main() -> ExitCode {

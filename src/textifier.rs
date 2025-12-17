@@ -8,25 +8,27 @@ mod lines;
 mod text;
 mod types;
 
+use crate::args::{ProcessingModes, RenderOptions};
+
 use self::gpu::WgpuContext;
 use self::text::translate_to_text;
 use self::types::*;
-use crate::Args;
 
 pub struct Textifier<'a> {
-    args: &'a Args,
+    args: &'a RenderOptions,
+    mode: Option<ProcessingModes>,
     internal_scale: (u32, u32),
     // input_width: u32,
     // input_height: u32,
     output_scale: (u32, u32),
     // output_width: u32,
     // output_height: u32,
-    abandon_gpu: bool,
     gpu: Option<WgpuContext>,
 }
 impl<'b> Textifier<'b> {
     pub fn new<'a>(
-        args: &'a Args,
+        args: &'a RenderOptions,
+        mode: Option<ProcessingModes>,
         internal_scale: (u32, u32),
         // input_width: u32,
         // input_height: u32,
@@ -36,7 +38,7 @@ impl<'b> Textifier<'b> {
     ) -> Textifier<'a> {
         return Textifier {
             args,
-            abandon_gpu: false,
+            mode,
             gpu: None,
             internal_scale,
             // input_width,
@@ -53,7 +55,7 @@ impl<'b> Textifier<'b> {
         gpu_image_height: u32,
         columns: u32,
         rows: u32,
-        line_pieces: image::ImageBuffer<Luma<u8>, Vec<u8>>,
+        // line_pieces: image::ImageBuffer<Luma<u8>, Vec<u8>>,
     ) -> Result<(), String> {
         let context = gpu::WgpuContext::setup(
             gpu_image_width,
@@ -61,7 +63,7 @@ impl<'b> Textifier<'b> {
             columns,
             rows,
             self.args.threshold,
-            line_pieces,
+            // line_pieces,
         )
         .block_on();
         match context {
@@ -92,7 +94,7 @@ impl<'b> Textifier<'b> {
                 self.internal_scale.1,
                 self.output_scale.0,
                 self.output_scale.1,
-                get_line_pieces(),
+                // get_line_pieces(),
             )?;
         }
 
@@ -102,29 +104,25 @@ impl<'b> Textifier<'b> {
     }
 
     fn run_try(&mut self, image: &DynamicImage) -> Result<Vec<Vec<CharacterData>>, String> {
-        if self.abandon_gpu {
+        let data = self.run_gpu(image);
+        if data.is_err() {
+            eprintln!("gpu failed, switching mode");
+            // Gpu failed, we are switching to cpu mode
+            self.mode = Some(ProcessingModes::CpuSimple);
             return self.run_cpu(image);
         }
 
-        let data = self.run_gpu(image);
-        if data.is_err() {
-            eprintln!(
-                // "gpu failed, running as cpu_simple, if you want full features on cpu run with cpu_full. keep in mind it can be very slow"
-                "gpu failed, running as cpu_simple, cpu_full is not yet implemented"
-            );
-            self.abandon_gpu = true;
-            return self.run_cpu(image);
-        }
+        // Gpu ran succesful, we are officially in gpu processing mode
+        self.mode = Some(ProcessingModes::Gpu);
         return data;
     }
 
     pub fn to_text(&mut self, image: DynamicImage) -> Result<String, String> {
         let data: Result<Vec<Vec<CharacterData>>, String>;
-        data = match self.args.processing_mode {
+        data = match self.mode {
             None => self.run_try(&image),
-            Some(crate::ProcessingModes::Gpu) => self.run_gpu(&image),
-            Some(crate::ProcessingModes::CpuSimple) => self.run_gpu(&image),
-            Some(crate::ProcessingModes::Cpu) => todo!(),
+            Some(ProcessingModes::Gpu) => self.run_gpu(&image),
+            Some(ProcessingModes::CpuSimple) => self.run_cpu(&image),
         };
 
         if let Err(e) = data {

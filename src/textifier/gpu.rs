@@ -35,7 +35,7 @@ impl WgpuContext {
         output_width: u32,
         output_height: u32,
         threshold: f32,
-        lines: image::ImageBuffer<Luma<u8>, Vec<u8>>,
+        // lines: image::ImageBuffer<Luma<u8>, Vec<u8>>,
     ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
         let adapter = instance
@@ -112,11 +112,11 @@ impl WgpuContext {
 
         // TODO unhardcode this shit
         // for now 5 chars high, every char is 8x8
-        let line_buffer = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("line buffer"),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
-            contents: lines.as_raw(),
-        });
+        // let line_buffer = device.create_buffer_init(&BufferInitDescriptor {
+        //     label: Some("line buffer"),
+        //     usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
+        //     contents: lines.as_raw(),
+        // });
 
         let pipeline_edges = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: None,
