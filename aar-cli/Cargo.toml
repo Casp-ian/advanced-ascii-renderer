@@ -1,0 +1,19 @@
+[package]
+name = "aar-cli"
+version = "0.1.0"
+edition = "2024"
+
+# [lib]
+# crate-type = ["bin"]
+
+# [profile.release]
+# strip = "debuginfo"
+# lto = "fat"
+# panic = "abort"
+
+[dependencies]
+aar = { path = "../aar" }
+image = "0.25.8"
+crossterm = { version = "0.29.0" }
+clap = { version = "4.5.48", features = ["derive"] }
+ctrlc = { version = "3.5.0" }

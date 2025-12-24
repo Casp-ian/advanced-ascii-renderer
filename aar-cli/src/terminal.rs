@@ -46,15 +46,14 @@ pub fn get_scale(
 }
 
 pub fn get_terminal_size() -> (u32, u32) {
-    if let Ok(size) = terminal::size() {
-        return (size.0 as u32, size.1 as u32);
-    } else {
-        let x = 200;
-        let y = 50;
-        eprintln!(
-            "Could not get width and height from terminal, resorting to hardcoded {} by {}",
-            x, y
-        );
-        return (x, y);
+    let default = (200, 50);
+
+    match terminal::size() {
+        Ok(size) => return (size.0 as u32, size.1 as u32),
+        Err(e) => {
+            eprintln!("Could not get width and height from terminal, error: {}", e);
+            eprintln!("Resorting to default: {:?}", default);
+            return default;
+        }
     }
 }

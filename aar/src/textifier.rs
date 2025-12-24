@@ -98,7 +98,11 @@ impl<'b> Textifier<'b> {
             )?;
         }
 
-        let gpu = self.gpu.as_ref().unwrap();
+        let gpu = match self.gpu.as_ref() {
+            Some(x) => x,
+            // NOTE this should be actually impossible
+            None => return Err("no gpu, even after setting up".to_string()),
+        };
 
         return gpu.process(image.to_rgba8()).block_on();
     }
@@ -125,11 +129,10 @@ impl<'b> Textifier<'b> {
             Some(ProcessingModes::CpuSimple) => self.run_cpu(&image),
         };
 
-        if let Err(e) = data {
-            return Err(e.to_string());
-        }
-
-        let result_string = translate_to_text(self.args, data.unwrap());
+        let result_string = match data {
+            Err(e) => return Err(e.to_string()),
+            Ok(x) => translate_to_text(self.args, x),
+        };
 
         return Ok(result_string);
     }

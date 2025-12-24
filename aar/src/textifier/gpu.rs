@@ -38,11 +38,14 @@ impl WgpuContext {
         // lines: image::ImageBuffer<Luma<u8>, Vec<u8>>,
     ) -> Result<WgpuContext, String> {
         let instance = wgpu::Instance::default();
-        let adapter = instance
+        let adapter = match instance
             .request_adapter(&wgpu::RequestAdapterOptions::default())
             .await
-            .unwrap();
-        let (device, queue) = adapter
+        {
+            Ok(x) => x,
+            Err(e) => return Err(e.to_string()),
+        };
+        let (device, queue) = match adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
                 required_features: wgpu::Features::empty(),
@@ -52,7 +55,10 @@ impl WgpuContext {
                 trace: wgpu::Trace::Off,
             })
             .await
-            .unwrap();
+        {
+            Ok(x) => x,
+            Err(e) => return Err(e.to_string()),
+        };
 
         // Our shader, kindly compiled with Naga.
         let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));

@@ -1,84 +1,68 @@
+use std::process::ExitCode;
+
+mod cli;
+use cli::get_cli_args;
+
+mod terminal;
 use image::ImageReader;
+use terminal::{get_scale, get_terminal_size};
 
-pub mod args;
-
-#[cfg(feature = "cli")]
-pub mod cli;
-
-pub mod video;
-
-pub mod ffutils;
-
-pub mod terminal;
-
-pub mod textifier;
-use textifier::Textifier;
-
-use crate::{
+use aar::{
     args::{MediaModes, Options},
-    ffutils::Meta,
-    terminal::{get_scale, get_terminal_size},
+    ffutils::{self, Meta},
+    textifier::Textifier,
+    video,
 };
 
-// do cli parsing pseudo code
-//
-// inputscale, duration, frames = getMeta(path)
-// internalScale, outputscale = getScales(characterSizes, specifiedOutputScale, inputScale, outputScaleLimit)
-//
-// textifier = init(internalScale, outputScale, renderOptions)
-//
-// image {
-//     image = getImage(path, internalScale)
-//     text = textifier(image)
-//     print(text)
-// }
-//
-// frames {
-//     frames = getFrames(path, internalScale, duration, frames, videoOptions)
-//
-//     image = frames.next() {
-//         text = textifier(image)
-//         print(text)
-//     }
-// }
-//
+fn do_before_exit() {
+    // new line because we might still be on another line
+    // also clear ansi color code
+    println!("\x1b[0m");
+}
 
-// pseudo try two
-//
-// renderer = renderBuilder();
-//
-// if let arg = cli arg {
-//    renderer.withArg(arg);
-// }
-//
-// renderer.withResolutions(scales);
-// renderer = renderer.build();
-//
-//
-// if let img = cli img {
-//    renderer.render(img)
-// }
-//
-//
+fn main() -> ExitCode {
+    let _ = ctrlc::set_handler(|| {
+        do_before_exit();
 
-pub fn run(args: &Options) -> Result<(), String> {
-    let metadata = ffutils::get_meta(&args.general.path)?;
+        // TODO, this doesnt stop any of the other processes gracefully, so sometimes a error message gets shown at exit
+        std::process::exit(0)
+    });
+
+    let options = get_cli_args();
+
+    let result: Result<(), String> = run(&options);
+
+    do_before_exit();
+
+    match result {
+        Ok(_) => {
+            return ExitCode::SUCCESS;
+        }
+        Err(e) => {
+            eprintln!("{}", e);
+            return ExitCode::FAILURE;
+        }
+    }
+}
+
+fn run(options: &Options) -> Result<(), String> {
+    let metadata = ffutils::get_meta(&options.general.path)?;
 
     let (internal_scale, output_scale) = get_scale(
-        (args.render.char_width, args.render.char_height),
-        (args.render.width, args.render.height),
+        (options.render.char_width, options.render.char_height),
+        (options.render.width, options.render.height),
         metadata.scale,
         get_terminal_size(),
     );
 
     let mut textifier = Textifier::new(
-        &args.render,
-        args.general.processing_mode,
+        &options.render,
+        options.general.processing_mode,
         internal_scale,
         output_scale,
     );
 
-    let is_video: bool = match args.general.media_mode {
+    let is_video: bool = match options.general.media_mode {
         Some(MediaModes::Video) => true,
         Some(MediaModes::Image) => false,
         None => {
@@ -92,9 +76,9 @@ pub fn run(args: &Options) -> Result<(), String> {
     };
 
     if is_video {
-        return do_video_stuff(args, &mut textifier, &internal_scale, metadata);
+        return do_video_stuff(options, &mut textifier, &internal_scale, metadata);
     } else {
-        return do_image_stuff(args, &mut textifier, &internal_scale);
+        return do_image_stuff(options, &mut textifier, &internal_scale);
     }
 }
 

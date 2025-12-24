@@ -1,80 +1,77 @@
-use clap::{Parser, ValueEnum, arg, builder::PossibleValue, command};
+use clap::{Parser, ValueEnum, arg, command};
 
-use crate::args::{
-    CharSet, ColorSet, GeneralOptions, MediaModes, Options, ProcessingModes, RenderOptions,
-    VideoOptions,
-};
+use aar::args::{GeneralOptions, Options, RenderOptions, VideoOptions};
 
 // TODO all of the default options are duplicated between Options and Args
 
 /// Take an image and turn it into text
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
-pub struct Args {
+struct Args {
     /// Path of image
-    pub path: std::path::PathBuf,
+    path: std::path::PathBuf,
 
     /// Width in characters
     #[arg(long)]
-    pub width: Option<u32>,
+    width: Option<u32>,
 
     /// Height in characters
     #[arg(long)]
-    pub height: Option<u32>,
+    height: Option<u32>,
 
     /// Color of text
-    #[arg(long, default_value_t = ColorSet::None, value_enum)]
-    pub color: ColorSet,
+    #[arg(long, value_enum, default_value_t)]
+    color: Color,
 
     /// Characters used for result
-    #[arg(long, default_value_t = CharSet::Ascii, value_enum)]
-    pub set: CharSet,
+    #[arg(long, value_enum, default_value_t)]
+    set: CharSet,
 
     /// Only affects videos, lower value is high quality, higher value is
     #[arg(short, long, default_value_t = 5)]
-    pub quality: u8,
+    quality: u8,
 
     /// Only affects videos, sets audio volume, clamps to 100
     #[arg(short, long, default_value_t = 0)]
-    pub volume: u8,
+    volume: u8,
 
     /// Only affects videos, sets ffmpeg format if ffmpeg cant auto detect
     #[arg(short, long)]
-    pub format: Option<String>,
+    format: Option<String>,
 
     /// make dark areas light, and light areas dark
     #[arg(long)]
-    pub inverted: bool,
+    inverted: bool,
 
     /// from 0 to 1, this is the threshold for how clear of an edge something has to be
     #[arg(long, default_value_t = 0.5)]
-    pub threshold: f32,
+    threshold: f32,
 
     /// remove the lines characters like /-\|
     #[arg(long)]
-    pub no_lines: bool,
+    no_lines: bool,
 
     /// remove everythin appart from the lines
     #[arg(long)]
-    pub only_lines: bool,
+    only_lines: bool,
 
     // this can only be checked by getting the space taken per character, and the spacing between characters from the terminal,
     // i do not know how to get these, so for now we have hardcoded defaults
     /// the width of a character in pixels, only use if the defaults dont suit your needs or dont match your font
     #[arg(long, default_value_t = 9)]
-    pub char_width: u32,
+    char_width: u32,
 
     /// the height of a character in pixels, only use if the defaults dont suit your needs or dont match your font
     #[arg(long, default_value_t = 20)]
-    pub char_height: u32,
+    char_height: u32,
 
     /// choose how to read the file
     #[arg(long, value_enum)]
-    pub media: Option<MediaModes>,
+    media: Option<Media>,
 
     /// choose wether to use gpu or cpu
     #[arg(long, value_enum)]
-    pub processing: Option<ProcessingModes>,
+    mode: Option<Mode>,
 }
 
 pub fn get_cli_args() -> Options {
@@ -83,15 +80,21 @@ pub fn get_cli_args() -> Options {
 
     let general = GeneralOptions {
         path: args.path,
-        media_mode: args.media,
-        processing_mode: args.processing,
+        media_mode: match args.media {
+            Some(x) => Some(x.into()),
+            None => None,
+        },
+        processing_mode: match args.mode {
+            Some(x) => Some(x.into()),
+            None => None,
+        },
     };
 
     let render = RenderOptions {
         width: args.width,
         height: args.height,
-        color: args.color,
-        set: args.set,
+        color: args.color.into(),
+        set: args.set.into(),
         inverted: args.inverted,
         threshold: args.threshold,
         no_lines: args.no_lines,
@@ -114,58 +117,66 @@ pub fn get_cli_args() -> Options {
     };
 }
 
-impl ValueEnum for ColorSet {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[ColorSet::None, ColorSet::RGB]
-    }
+// NOTE all of the enums need either a newly defined trait or type, to satisfy rusts orphan rule, a little annoying
 
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        match self {
-            ColorSet::None => Some(PossibleValue::new("none")),
-            ColorSet::RGB => Some(PossibleValue::new("rgb")),
+#[derive(ValueEnum, Clone, Debug, Default)]
+enum CharSet {
+    #[default]
+    Ascii,
+    Braile,
+    Numbers,
+    Discord,
+}
+impl From<CharSet> for aar::args::CharSet {
+    fn from(value: CharSet) -> Self {
+        match value {
+            CharSet::Ascii => aar::args::CharSet::Ascii,
+            CharSet::Braile => aar::args::CharSet::Braile,
+            CharSet::Numbers => aar::args::CharSet::Numbers,
+            CharSet::Discord => aar::args::CharSet::Discord,
         }
     }
 }
-impl ValueEnum for CharSet {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[
-            CharSet::Ascii,
-            CharSet::Braile,
-            CharSet::Numbers,
-            CharSet::Discord,
-        ]
-    }
 
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        match self {
-            CharSet::Ascii => Some(PossibleValue::new("ascii")),
-            CharSet::Braile => Some(PossibleValue::new("braile")),
-            CharSet::Numbers => Some(PossibleValue::new("numbers")),
-            CharSet::Discord => Some(PossibleValue::new("discord")),
+#[derive(ValueEnum, Clone, Debug, Default)]
+enum Color {
+    #[default]
+    None,
+    RGB,
+}
+impl From<Color> for aar::args::ColorSet {
+    fn from(value: Color) -> Self {
+        match value {
+            Color::None => aar::args::ColorSet::None,
+            Color::RGB => aar::args::ColorSet::RGB,
         }
     }
 }
-impl ValueEnum for MediaModes {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[MediaModes::Image, MediaModes::Video]
-    }
 
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        match self {
-            MediaModes::Image => Some(PossibleValue::new("image")),
-            MediaModes::Video => Some(PossibleValue::new("video")),
+#[derive(ValueEnum, Clone, Debug)]
+enum Media {
+    Image,
+    Video,
+}
+impl From<Media> for aar::args::MediaModes {
+    fn from(value: Media) -> Self {
+        match value {
+            Media::Image => aar::args::MediaModes::Image,
+            Media::Video => aar::args::MediaModes::Video,
         }
     }
 }
-impl ValueEnum for ProcessingModes {
-    fn value_variants<'a>() -> &'a [Self] {
-        &[ProcessingModes::Gpu, ProcessingModes::CpuSimple]
-    }
 
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        match self {
-            ProcessingModes::Gpu => Some(PossibleValue::new("gpu")),
-            ProcessingModes::CpuSimple => Some(PossibleValue::new("cpu")),
+#[derive(ValueEnum, Clone, Debug)]
+enum Mode {
+    Cpu,
+    Gpu,
+}
+impl From<Mode> for aar::args::ProcessingModes {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Cpu => aar::args::ProcessingModes::CpuSimple,
+            Mode::Gpu => aar::args::ProcessingModes::Gpu,
         }
     }
 }
